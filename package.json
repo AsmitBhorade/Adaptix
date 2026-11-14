@@ -1,0 +1,166 @@
+{
+  "name": "adaptix",
+  "displayName": "Adaptix 3.0",
+  "description": "ADAPTIX 3.0 — Frictionless Developer-First Algorithm & Data Structure Optimization Engine",
+  "publisher": "adhirajpatil",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AdhirajPatil6/Adaptix-DSA"
+  },
+  "icon": "images/logo.png",
+  "version": "3.0.0",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Education",
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:cpp",
+    "onLanguage:c",
+    "onView:adaptix.insightsView"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Adaptix 3.0",
+      "properties": {
+        "adaptix.academicMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Advanced Academic Mode to unlock NP-Completeness Advisor, Nature-Inspired Optimization Lab, and full theoretical derivations."
+        },
+        "adaptix.optimizationBias": {
+          "type": "string",
+          "enum": [
+            "speed",
+            "balanced",
+            "memory"
+          ],
+          "enumDescriptions": [
+            "Speed-First: Prioritizes memoization, tabulation, O(1) hash maps, and precomputation.",
+            "Balanced: Geometric mean optimization balancing execution time against auxiliary memory.",
+            "Memory-First: Prioritizes in-place transformations, iterative two-pointers, bit manipulation, and compact arrays."
+          ],
+          "default": "speed",
+          "description": "Optimization Bias slider control governing algorithmic recommendations and refactoring patterns."
+        },
+        "adaptix.autoEdgeCaseCheck": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically generate compilable C++ counterexample test harnesses when fragile algorithms are detected."
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "adaptix",
+          "title": "Adaptix 3.0",
+          "icon": "$(pulse)"
+        }
+      ]
+    },
+    "views": {
+      "adaptix": [
+        {
+          "type": "webview",
+          "id": "adaptix.insightsView",
+          "name": "Adaptix Dashboard",
+          "icon": "$(pulse)"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "adaptix.showInsights",
+        "title": "Adaptix: Show Developer Dashboard",
+        "category": "Adaptix"
+      },
+      {
+        "command": "adaptix.toggleAcademicMode",
+        "title": "Adaptix: Toggle Advanced Academic Mode",
+        "category": "Adaptix"
+      },
+      {
+        "command": "adaptix.setOptimizationBias",
+        "title": "Adaptix: Set Optimization Bias (Speed / Balanced / Memory)",
+        "category": "Adaptix"
+      },
+      {
+        "command": "adaptix.injectTemplate",
+        "title": "Adaptix: Inject Algorithmic Skeleton Template",
+        "category": "Adaptix"
+      },
+      {
+        "command": "adaptix.openSmartDiff",
+        "title": "Adaptix: Preview Semantic Smart Diff",
+        "category": "Adaptix"
+      },
+      {
+        "command": "adaptix.runEdgeCaseTest",
+        "title": "Adaptix: Run Automated Edge-Case & Counterexample Test",
+        "category": "Adaptix"
+      },
+      {
+        "command": "adaptix.runBeforeAfterBenchmark",
+        "title": "Adaptix: Run Closed-Loop Before/After Benchmark",
+        "category": "Adaptix"
+      },
+      {
+        "command": "adaptix.runBenchmark",
+        "title": "Adaptix: Run Empirical Complexity Benchmark",
+        "category": "Adaptix"
+      },
+      {
+        "command": "adaptix.openVisualizer",
+        "title": "Adaptix: Open Visual Algorithm Debugger",
+        "category": "Adaptix"
+      },
+      {
+        "command": "adaptix.openNatureLab",
+        "title": "Adaptix: Open Nature-Inspired Optimization Lab (Academic)",
+        "category": "Adaptix"
+      },
+      {
+        "command": "adaptix.openNPAdvisor",
+        "title": "Adaptix: Open NP-Completeness Advisor (Academic)",
+        "category": "Adaptix"
+      },
+      {
+        "command": "adaptix.analyzeCurrentFile",
+        "title": "Adaptix: Run Full Analysis Pipeline",
+        "category": "Adaptix"
+      },
+      {
+        "command": "adaptix.applyRefactor",
+        "title": "Adaptix: Apply Safe Refactor",
+        "category": "Adaptix"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "npm run test:unit",
+    "test:unit": "tsc -p ./ && node out/test/runAllTests.js",
+    "demo": "tsc -p ./ && node out/demoRun.js",
+    "test:vscode": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "@types/vscode": "^1.90.0",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.39.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1"
+  }
+}

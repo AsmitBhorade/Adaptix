@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADAPTIX 3.0</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Top Brand Header -->
+    <div class="brand-header">
+        <div class="brand-title">
+            <span class="brand-logo-text">ADAPTIX</span>
+            <span class="brand-badge">3.0 PRO</span>
+        </div>
+        <div class="header-controls">
+            <!-- Academic Mode Toggle -->
+            <label class="academic-toggle-container" title="Toggle Semester 5 DAA Academic Mode (NP-Completeness, Nature Lab, Theoretical Derivations)">
+                <span>Academic Mode</span>
+                <div class="switch">
+                    <input type="checkbox" id="academicModeCheckbox" onchange="toggleAcademicMode()">
+                    <span class="slider"></span>
+                </div>
+            </label>
+        </div>
+    </div>
+
+    <!-- Consolidated 3-Pillar Navigation Tabs -->
+    <div class="nav-tabs">
+        <button class="nav-tab active" data-tab="intelligence" onclick="selectTab('intelligence')">
+            <span>🧠</span> Code Intelligence
+        </button>
+        <button class="nav-tab" data-tab="performance" onclick="selectTab('performance')">
+            <span>⚡</span> Performance Lab
+        </button>
+        <button class="nav-tab" data-tab="visualizer" onclick="selectTab('visualizer')">
+            <span>🔬</span> Visual Debugger
+        </button>
+        <!-- Dynamic Academic Tab (revealed when Academic Mode is ON) -->
+        <button id="academicNavTab" class="nav-tab academic-tab" data-tab="academic" style="display: none;" onclick="selectTab('academic')">
+            <span>🎓</span> Academic Lab
+        </button>
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <!-- TAB 1: CODE INTELLIGENCE -->
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <div id="tab-intelligence" class="tab-panel active">
+        <!-- Status Card -->
+        <div class="glass-card">
+            <div class="card-header">
+                <span class="card-title">Real-Time Intelligence Pipeline</span>
+                <span id="pipelineHealthBadge" class="badge conf-strong">Active Keystroke Listener</span>
+            </div>
+            <p id="pipelineHeadline" style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px;">
+                Continuous AST parsing, STL Big-O inspections, and algorithmic paradigm detection active.
+            </p>
+        </div>
+
+        <!-- Dynamic Container & Variable Optimizations -->
+        <div id="containerCardsContainer">
+            <!-- Rendered by Webview Provider -->
+        </div>
+
+        <!-- Edge-Case & Counterexample Results Card -->
+        <div id="edgeCaseResultBox" style="display: none; margin-bottom: 12px;"></div>
+
+        <!-- Quick Algorithmic Actions -->
+        <div class="glass-card">
+            <span class="card-title" style="display: block; margin-bottom: 8px;">Automated Algorithmic Actions</span>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                <button class="btn-action" onclick="injectTemplate('dynamic_programming_tab')">
+                    <span>🛠️</span> Inject DP Skeleton
+                </button>
+                <button class="btn-action" onclick="injectTemplate('two_pointers')">
+                    <span>🎯</span> Two-Pointers Template
+                </button>
+                <button class="btn-action purple" onclick="runEdgeCaseTest('coin_change')">
+                    <span>🧪</span> Counterexample Test
+                </button>
+                <button class="btn-action success" onclick="runBeforeAfterBenchmark('arr', 'std::vector', 'std::unordered_set')">
+                    <span>📊</span> Benchmark Refactor
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <!-- TAB 2: PERFORMANCE LAB -->
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <div id="tab-performance" class="tab-panel">
+        <!-- Interactive Space vs. Time Optimization Slider -->
+        <div class="bias-slider-container">
+            <div class="bias-slider-header">
+                <strong>Optimization Bias</strong>
+                <span id="biasCurrentLabel" style="color: var(--accent-cyan); font-weight: 700;">Speed-First [O(1) Time]</span>
+            </div>
+            <input type="range" id="biasRangeInput" class="bias-range-input" min="0" max="2" step="1" value="2" oninput="onBiasSliderChange(this.value)">
+            <div class="bias-labels">
+                <span>Memory-First [O(1) Space]</span>
+                <span>Balanced</span>
+                <span>Speed-First [O(1) Time]</span>
+            </div>
+        </div>
+
+        <!-- Before vs. After Closed-Loop Benchmark Container -->
+        <div id="beforeAfterResultBox" style="display: none; margin-bottom: 12px;"></div>
+
+        <!-- Empirical Benchmark Suite Runner -->
+        <div class="glass-card">
+            <div class="card-header">
+                <span class="card-title">Empirical Benchmark Lab</span>
+                <span class="badge conf-strong">C++ Execution Runner</span>
+            </div>
+            <p style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 10px;">
+                Execute compiled C++ algorithmic benchmarks across controlled input distributions and sizes.
+            </p>
+            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                <select id="benchSuite" class="speed-select" style="flex: 2;">
+                    <option value="sorting">Sorting Suite (Bubble vs Merge vs Quick)</option>
+                    <option value="fibonacci">Fibonacci Suite (Exponential Recursion vs DP)</option>
+                    <option value="search">Search Suite (Linear Search vs Binary Search)</option>
+                </select>
+                <select id="benchDist" class="speed-select" style="flex: 1;">
+                    <option value="random">Random</option>
+                    <option value="sorted">Sorted</option>
+                    <option value="reverse_sorted">Reverse</option>
+                    <option value="duplicate_heavy">Duplicates</option>
+                </select>
+            </div>
+            <button class="btn-action" style="width: 100%;" onclick="triggerBenchmarkSuite()">
+                <span>⚡</span> Execute Controlled Benchmark
+            </button>
+        </div>
+
+        <!-- Benchmark Results Display -->
+        <div id="benchmarkResultContainer" style="display: none;" class="glass-card">
+            <div class="card-header">
+                <span id="benchTitle" class="card-title" style="color: var(--accent-cyan);">Benchmark Results</span>
+            </div>
+            <div id="benchmarkSummary" style="font-size: 0.72rem; color: var(--text-primary); margin-bottom: 8px; background: rgba(0,0,0,0.25); padding: 8px; border-radius: 4px;"></div>
+            <div id="benchmarkTableContainer" class="dp-table-container"></div>
+        </div>
+
+        <!-- History & Reports (Compact Drawer) -->
+        <details class="explain-accordion" style="margin-top: 10px;">
+            <summary>
+                <span>📜 Session Adaptation History & Reports</span>
+            </summary>
+            <div class="accordion-body" id="historyContainer">
+                <p style="font-size: 0.72rem; color: var(--text-muted);">No refactorings applied in current session yet.</p>
+            </div>
+        </details>
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <!-- TAB 3: VISUAL DEBUGGER WITH TIMELINE SCRUBBER -->
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <div id="tab-visualizer" class="tab-panel">
+        <div class="timeline-scrubber-card">
+            <div class="timeline-scrubber-header">
+                <span class="card-title">Interactive Algorithm Trace</span>
+                <span id="vizFrameCounter" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent-cyan);">Frame 0 of 0</span>
+            </div>
+
+            <!-- Preset Selector -->
+            <div style="display: flex; gap: 6px; margin-bottom: 10px;">
+                <select id="vizPresetSelect" class="speed-select" style="flex: 1;" onchange="loadSelectedTrace()">
+                    <option value="dp_table">Dynamic Programming: 0/1 Knapsack State Table</option>
+                    <option value="recursion_tree">Recursion Tree: Fibonacci Overlapping Calls</option>
+                    <option value="backtracking">Backtracking: N-Queens Constraint Pruning</option>
+                    <option value="graph">Graph Traversal: Dijkstra's Shortest Path</option>
+                    <option value="sorting_searching">Sorting: QuickSort Partitioning Pivot</option>
+                </select>
+                <button class="btn-action" onclick="loadSelectedTrace()">Load</button>
+            </div>
+
+            <!-- Timeline Scrubber Range Slider -->
+            <input type="range" id="vizTimelineScrubber" class="timeline-range" min="0" max="0" value="0" oninput="scrubToFrame(this.value)">
+
+            <!-- Scrubber Playback Controls -->
+            <div class="timeline-controls">
+                <button class="btn-icon" onclick="timelineFirst()" title="First Frame">|◀◀</button>
+                <button class="btn-icon" onclick="timelinePrev()" title="Previous Frame">◀</button>
+                <button id="vizPlayPauseBtn" class="btn-icon active" onclick="timelineTogglePlay()" style="min-width: 75px;">▶ Play</button>
+                <button class="btn-icon" onclick="timelineNext()" title="Next Frame">▶</button>
+                <button class="btn-icon" onclick="timelineLast()" title="Last Frame">▶▶|</button>
+
+                <select id="vizSpeedSelect" class="speed-select" onchange="setPlaybackSpeed(this.value)" title="Playback Speed">
+                    <option value="0.5">0.5x</option>
+                    <option value="1.0" selected>1.0x</option>
+                    <option value="2.0">2.0x</option>
+                    <option value="5.0">5.0x</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Trace Display Viewport -->
+        <div id="vizDisplayContainer" class="glass-card" style="display: none;">
+            <div id="vizStepTitle" style="font-weight: 700; color: var(--accent-cyan); font-size: 0.8rem; margin-bottom: 4px;"></div>
+            <div id="vizStepExplanation" style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 8px;"></div>
+            <div class="chart-box" style="height: 220px;">
+                <canvas id="vizCanvas"></canvas>
+            </div>
+            <div id="vizCustomDOM"></div>
+        </div>
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <!-- TAB 4: ACADEMIC LAB (SEMESTER 5 DAA / NP / NATURE) -->
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <div id="tab-academic" class="tab-panel">
+        <div class="glass-card" style="border-left: 3px solid var(--accent-purple);">
+            <div class="card-header">
+                <span class="card-title" style="color: var(--accent-purple);">DAA Semester 5 Academic Lab</span>
+                <span class="badge academic">Academic Mode Active</span>
+            </div>
+            <p style="font-size: 0.72rem; color: var(--text-secondary);">
+                Theoretical complexity proofs, Cook-Levin reduction classifications, and nature-inspired metaheuristic optimizers.
+            </p>
+        </div>
+
+        <!-- NP Feasibility Advisor -->
+        <div class="glass-card">
+            <span class="card-title" style="display: block; margin-bottom: 6px;">NP-Completeness & Feasibility Advisor</span>
+            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                <select id="npProblemSelect" class="speed-select" style="flex: 2;">
+                    <option value="tsp">Travelling Salesperson Problem (TSP)</option>
+                    <option value="vertex_cover">Minimum Vertex Cover</option>
+                    <option value="sat">Boolean Satisfiability (SAT / 3-SAT)</option>
+                    <option value="clique">Maximum Clique</option>
+                    <option value="independent_set">Maximum Independent Set</option>
+                    <option value="ilp">Integer Linear Programming (ILP)</option>
+                </select>
+                <input id="npInputN" type="number" class="speed-select" value="20" min="2" max="10000" style="width: 60px;" />
+                <button class="btn-action purple" onclick="assessNP()">Evaluate</button>
+            </div>
+        </div>
+
+        <div id="npAssessmentResult" style="display: none;" class="glass-card">
+            <div class="card-header">
+                <span id="npResultTitle" class="card-title">Feasibility Report</span>
+                <span id="npTierBadge" class="badge"></span>
+            </div>
+            <div style="font-size: 0.72rem; line-height: 1.5;">
+                <p><strong>Exact Operations:</strong> <span id="npOps" style="font-family: var(--font-mono); color: var(--accent-orange);"></span></p>
+                <p><strong>Estimated Exact Runtime:</strong> <span id="npTime" style="color: var(--accent-orange);"></span></p>
+                <p><strong>Recommended Strategy:</strong> <span id="npRec" style="color: var(--accent-green); font-weight: 600;"></span></p>
+                <p id="npSpecific" style="margin-top: 4px; color: var(--text-secondary);"></p>
+                <div style="background: rgba(0,0,0,0.25); border-left: 3px solid var(--accent-purple); padding: 6px; margin-top: 6px; border-radius: 2px;">
+                    <strong>Approximation / Optimality Trade-off:</strong>
+                    <p id="npTradeoff" style="margin-top: 2px; color: var(--text-secondary);"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Nature-Inspired Optimization Lab -->
+        <div class="glass-card">
+            <div class="card-header">
+                <span class="card-title">Nature-Inspired Metaheuristics</span>
+                <span class="badge conf-strong">Deterministic Seeds</span>
+            </div>
+            <p style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 8px;">
+                Ant Colony Optimization (ACO), Particle Swarm Optimization (PSO), and Genetic Algorithms (GA).
+            </p>
+            <div style="display: flex; gap: 6px;">
+                <button class="btn-action purple" style="flex: 1;" onclick="runNatureOpt('compare_tsp')">
+                    ACO vs GA (TSP Route)
+                </button>
+                <button class="btn-action purple" style="flex: 1;" onclick="runNatureOpt('compare_continuous')">
+                    PSO vs GA (Continuous)
+                </button>
+            </div>
+        </div>
+
+        <div id="natureResultBox" style="display: none;" class="glass-card">
+            <div class="card-header">
+                <span id="natureResultTitle" class="card-title">Convergence Comparison</span>
+                <span id="natureWinnerBadge" class="badge recommendation"></span>
+            </div>
+            <div class="chart-box" style="height: 200px;">
+                <canvas id="natureCanvas"></canvas>
+            </div>
+            <p id="natureSummaryText" style="font-size: 0.72rem; color: var(--text-primary); margin: 6px 0; background: rgba(0,0,0,0.25); padding: 8px; border-radius: 4px;"></p>
+            <div id="natureMetricsGrid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;"></div>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
+
