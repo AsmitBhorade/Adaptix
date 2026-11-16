@@ -328,6 +328,86 @@ int lcsDP(const std::string& s1, const std::string& s2) {
         ]
     },
 
+    'kmp_string_matching': {
+        id: 'kmp_string_matching',
+        title: 'Knuth-Morris-Pratt (KMP) Substring Search',
+        paradigm: 'dynamic_programming',
+        description: 'Find pattern occurrences in text in linear time using a precomputed Longest Proper Prefix which is also Suffix (LPS) table.',
+        subproblemCharacteristics: 'Computes state transitions using the longest proper prefix of pattern[0..i] that is also a suffix.',
+        optimalSubstructure: 'Prefix matches from previous indices inform the fallback state without rolling the text index backward.',
+        recurrenceRelation: 'pi[q] = max{k : P_k is a proper suffix of P_q} ==> Preprocessing: O(M), Matching: O(N)',
+        naiveCodeCpp: `// Naive Nested Substring Search - O(N * M)
+int naiveSubstringSearch(const std::string& text, const std::string& pattern) {
+    int n = text.length();
+    int m = pattern.length();
+    for (int i = 0; i <= n - m; i++) {
+        int j = 0;
+        while (j < m && text[i + j] == pattern[j]) {
+            j++;
+        }
+        if (j == m) return i;
+    }
+    return -1;
+}`,
+        naiveTimeComplexity: 'O(N * M)',
+        naiveSpaceComplexity: 'O(1)',
+        optimalCodeCpp: `// Knuth-Morris-Pratt (KMP) Algorithm - O(N + M)
+std::vector<int> computeLPS(const std::string& pattern) {
+    int m = pattern.length();
+    std::vector<int> lps(m, 0);
+    int len = 0, i = 1;
+    while (i < m) {
+        if (pattern[i] == pattern[len]) {
+            len++;
+            lps[i] = len;
+            i++;
+        } else {
+            if (len != 0) {
+                len = lps[len - 1];
+            } else {
+                lps[i] = 0;
+                i++;
+            }
+        }
+    }
+    return lps;
+}
+
+int kmpSearch(const std::string& text, const std::string& pattern) {
+    int n = text.length(), m = pattern.length();
+    std::vector<int> lps = computeLPS(pattern);
+    int i = 0, j = 0;
+    while (i < n) {
+        if (pattern[j] == text[i]) {
+            i++;
+            j++;
+        }
+        if (j == m) {
+            return i - j;
+        } else if (i < n && pattern[j] != text[i]) {
+            if (j != 0) {
+                j = lps[j - 1];
+            } else {
+                i++;
+            }
+        }
+    }
+    return -1;
+}`,
+        optimalTimeComplexity: 'O(N + M)',
+        optimalSpaceComplexity: 'O(M)',
+        tradeoffs: [
+            'Transforms worst-case O(N * M) quadratic comparison cost into guaranteed O(N + M) linear time.',
+            'Never backtracks the text index pointer i, ideal for streaming inputs.',
+            'Requires O(M) auxiliary space for the LPS prefix table.'
+        ],
+        whyParadigmApplies: 'Precomputed prefix-suffix overlaps capture optimal subpattern structure, avoiding redundant re-comparisons of previously matched characters.',
+        whyOtherParadigmsFail: 'Naive brute-force repeatedly re-scans characters upon mismatch (O(N * M)). Rolling hash (Rabin-Karp) handles multi-pattern or average O(N+M) but risks hash collisions.',
+        testCases: [
+            { input: { text: 'ABABDABACDABABCABAB', pattern: 'ABABCABAB' }, expected: 10 }
+        ]
+    },
+
     'longest_increasing_subsequence': {
         id: 'longest_increasing_subsequence',
         title: 'Longest Increasing Subsequence (LIS)',

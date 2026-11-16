@@ -114,11 +114,13 @@ export interface DecisionResult {
     optimizationBias?: 'speed' | 'balanced' | 'memory';
 }
 
-export function getComplexityWeight(ds: string, operation: 'search' | 'insert' | 'delete'): number {
+export function getComplexityWeight(ds: string, operation: 'search' | 'insert' | 'delete', constraints?: Constraints): number {
     // Enhanced cost weight map with realistic penalties
     // Base: O(1)=1, O(logN)=5, O(N)=100
     if (ds.includes('vector')) {
-        if (operation === 'insert') { return 1; }  // amortized push_back
+        if (operation === 'insert') {
+            return constraints?.needsSequenceEfficiency ? 100 : 1; // front insert shifts all elements O(n)
+        }
         if (operation === 'search') { return 100; } // linear scan (fast due to cache)
         return 100; // erase is O(n) shift
     }
@@ -199,15 +201,15 @@ function getMemoryOverhead(ds: string): number {
     return 10;
 }
 
-function calculateCost(ds: string, monitor: Monitor, optProfile: 'speed' | 'memory' | 'balanced' = 'speed'): number {
+function calculateCost(ds: string, monitor: Monitor, optProfile: 'speed' | 'memory' | 'balanced' = 'speed', constraints?: Constraints): number {
     // Segment Tree used for aggregating operation costs via monitor.queryCost()
     const [insertOps, searchOps, deleteOps] = monitor.operationCosts;
     const totalOps = insertOps + searchOps + deleteOps;
     
     // TIME COST: Big-O weighted operation count
-    const timeCost = (insertOps * getComplexityWeight(ds, 'insert')) +
-        (searchOps * getComplexityWeight(ds, 'search')) +
-        (deleteOps * getComplexityWeight(ds, 'delete'));
+    const timeCost = (insertOps * getComplexityWeight(ds, 'insert', constraints)) +
+        (searchOps * getComplexityWeight(ds, 'search', constraints)) +
+        (deleteOps * getComplexityWeight(ds, 'delete', constraints));
 
     if (optProfile === 'speed') {
         // Pure time optimization — memory is irrelevant
@@ -342,7 +344,7 @@ export class DecisionEngine {
         const optProfile = intentSignal?.optimizationProfile || 'speed';
 
         // Current cost
-        const currentCost = calculateCost(currentStructure, monitor, optProfile);
+        const currentCost = calculateCost(currentStructure, monitor, optProfile, constraints);
         // Determine truly dominant operation by comparing all three ratios
         const ratios: [('search' | 'insert' | 'delete'), number][] = [
             ['search', searchRatio], ['insert', insertRatio], ['delete', deleteRatio]
@@ -360,7 +362,7 @@ export class DecisionEngine {
             const candidateHeap = new MinHeap();
 
             for (const ds of valid) {
-                let cost = calculateCost(ds, monitor, optProfile);
+                let cost = calculateCost(ds, monitor, optProfile, constraints);
                 
                 // Give a strong bonus (cost reduction) to the current structure
                 // to avoid suggesting changes for marginal performance gains.
@@ -416,12 +418,16 @@ export class DecisionEngine {
                suggestion = 'std::vector';
            } else if (deleteRatio > 0.3 && insertRatio > 0.3 && valid.includes('std::list') && !currentStructure.includes('list')) {
                suggestion = 'std::list';
+           } else if (constraints.needsSequenceEfficiency && currentStructure.includes('vector')) {
+               suggestion = (constraints.needsIndexAccess && valid.includes('std::deque'))
+                   ? 'std::deque'
+                   : valid.includes('std::list') ? 'std::list' : (valid.includes('std::deque') ? 'std::deque' : null);
            }
 
            // Gate: verify fallback suggestion is meaningfully better
            if (suggestion && suggestion !== currentStructure) {
-               const fallbackCost = calculateCost(suggestion, monitor, optProfile);
-               const rawCurrentCost = calculateCost(currentStructure, monitor, optProfile);
+               const fallbackCost = calculateCost(suggestion, monitor, optProfile, constraints);
+               const rawCurrentCost = calculateCost(currentStructure, monitor, optProfile, constraints);
                if (rawCurrentCost <= fallbackCost * 1.3) {
                    // Current is already close to or better than the suggestion — stay optimal
                    suggestion = null;
@@ -430,10 +436,10 @@ export class DecisionEngine {
         }
 
         if (suggestion && suggestion !== currentStructure) {
-            const suggestedCost = calculateCost(suggestion, monitor, optProfile);
+            const suggestedCost = calculateCost(suggestion, monitor, optProfile, constraints);
 
             // Only suggest if there's a meaningful improvement (at least 1.3x speedup)
-            const rawCurrentCost = calculateCost(currentStructure, monitor, optProfile);
+            const rawCurrentCost = calculateCost(currentStructure, monitor, optProfile, constraints);
             const rawSpeedup = rawCurrentCost / Math.max(suggestedCost, 1);
 
             if (rawSpeedup > 1.3 && (currentCost > suggestedCost || suggestion === preferredFromIntent)) {
@@ -490,7 +496,7 @@ export class DecisionEngine {
                     // Priority Queue (Min-Heap) used for ranking alternative data structure
                     const altHeap = new MinHeap();
                     for (const v of remainingValid) {
-                        altHeap.push({ name: v, score: calculateCost(v, monitor, optProfile) });
+                        altHeap.push({ name: v, score: calculateCost(v, monitor, optProfile, constraints) });
                     }
                     const secondBestEntry = altHeap.pop();
                     let secondBest = secondBestEntry ? secondBestEntry.name : remainingValid[0];

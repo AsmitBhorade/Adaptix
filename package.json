@@ -2,10 +2,11 @@
   "name": "adaptix",
   "displayName": "Adaptix 3.0",
   "description": "ADAPTIX 3.0 — Frictionless Developer-First Algorithm & Data Structure Optimization Engine",
-  "publisher": "adhirajpatil",
+  "publisher": "asmitbhorade",
+  "author": "Asmit Bhorade",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AdhirajPatil6/Adaptix-DSA"
+    "url": "https://github.com/AsmitBhorade/Adaptix"
   },
   "icon": "images/logo.png",
   "version": "3.0.0",
@@ -77,68 +78,13 @@
     "commands": [
       {
         "command": "adaptix.showInsights",
-        "title": "Adaptix: Show Developer Dashboard",
-        "category": "Adaptix"
-      },
-      {
-        "command": "adaptix.toggleAcademicMode",
-        "title": "Adaptix: Toggle Advanced Academic Mode",
-        "category": "Adaptix"
-      },
-      {
-        "command": "adaptix.setOptimizationBias",
-        "title": "Adaptix: Set Optimization Bias (Speed / Balanced / Memory)",
-        "category": "Adaptix"
-      },
-      {
-        "command": "adaptix.injectTemplate",
-        "title": "Adaptix: Inject Algorithmic Skeleton Template",
-        "category": "Adaptix"
-      },
-      {
-        "command": "adaptix.openSmartDiff",
-        "title": "Adaptix: Preview Semantic Smart Diff",
-        "category": "Adaptix"
-      },
-      {
-        "command": "adaptix.runEdgeCaseTest",
-        "title": "Adaptix: Run Automated Edge-Case & Counterexample Test",
-        "category": "Adaptix"
-      },
-      {
-        "command": "adaptix.runBeforeAfterBenchmark",
-        "title": "Adaptix: Run Closed-Loop Before/After Benchmark",
-        "category": "Adaptix"
-      },
-      {
-        "command": "adaptix.runBenchmark",
-        "title": "Adaptix: Run Empirical Complexity Benchmark",
-        "category": "Adaptix"
-      },
-      {
-        "command": "adaptix.openVisualizer",
-        "title": "Adaptix: Open Visual Algorithm Debugger",
-        "category": "Adaptix"
-      },
-      {
-        "command": "adaptix.openNatureLab",
-        "title": "Adaptix: Open Nature-Inspired Optimization Lab (Academic)",
-        "category": "Adaptix"
-      },
-      {
-        "command": "adaptix.openNPAdvisor",
-        "title": "Adaptix: Open NP-Completeness Advisor (Academic)",
-        "category": "Adaptix"
+        "title": "Open ADAPTIX Dashboard",
+        "category": "ADAPTIX"
       },
       {
         "command": "adaptix.analyzeCurrentFile",
-        "title": "Adaptix: Run Full Analysis Pipeline",
-        "category": "Adaptix"
-      },
-      {
-        "command": "adaptix.applyRefactor",
-        "title": "Adaptix: Apply Safe Refactor",
-        "category": "Adaptix"
+        "title": "Analyze Current File",
+        "category": "ADAPTIX"
       }
     ]
   },
@@ -151,6 +97,7 @@
     "test": "npm run test:unit",
     "test:unit": "tsc -p ./ && node out/test/runAllTests.js",
     "demo": "tsc -p ./ && node out/demoRun.js",
+    "package": "vsce package --no-dependencies",
     "test:vscode": "vscode-test"
   },
   "devDependencies": {
@@ -159,6 +106,7 @@
     "@types/vscode": "^1.90.0",
     "@vscode/test-cli": "^0.0.11",
     "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^4.1.1",
     "eslint": "^9.39.3",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1"

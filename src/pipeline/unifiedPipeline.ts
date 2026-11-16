@@ -1,7 +1,7 @@
 /**
  * Unified Intelligence and Recommendation Pipeline
  * 
- * Central nervous system of ADAPTIX 2.0. Connects:
+ * Central nervous system of ADAPTIX 3.0. Connects:
  * 1. Data Structure Intelligence (Semester 4 DSA: Analyzer, Monitor, DecisionEngine)
  * 2. Algorithm Strategy Engine (Semester 5 DAA: StrategyDetector, Master Theorem)
  * 3. NP-Completeness & Approximation Advisor (NPAdvisor, Feasibility)

@@ -16,6 +16,22 @@ export interface AdaptationRecord {
     time: string;
 }
 
+export interface FileAnalysisInfo {
+    fileName: string;
+    filePath: string;
+    uri: string;
+    version: number;
+    lastAnalyzed: string;
+}
+
+export interface RecentAnalysisRecord {
+    fileName: string;
+    filePath: string;
+    timestamp: string;
+    findingsCount: number;
+    status: 'Analyzed' | 'Clean' | 'Optimized';
+}
+
 function escapeHtml(text: string): string {
     return text
         .replace(/&/g, "&amp;")
@@ -31,12 +47,13 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
     private _latestData: Map<string, AnalysisContext> = new Map();
     private _history: AdaptationRecord[] = [];
     private _latestReport?: UnifiedAnalysisReport;
-    private _activeTab: string = 'intelligence';
+    private _activeTab: string = 'overview';
     private _academicMode: boolean = false;
     private _optimizationBias: 'memory' | 'balanced' | 'speed' = 'speed';
+    private _currentFile?: FileAnalysisInfo;
+    private _recentAnalyses: RecentAnalysisRecord[] = [];
 
     constructor(private readonly _extensionUri: vscode.Uri) {
-        // Read initial configuration
         const config = vscode.workspace.getConfiguration('adaptix');
         this._academicMode = config.get<boolean>('academicMode', false);
         this._optimizationBias = config.get<'memory' | 'balanced' | 'speed'>('optimizationBias', 'speed');
@@ -46,7 +63,7 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
         this._academicMode = enabled;
         if (this._view) {
             this._view.webview.postMessage({ type: 'stateUpdate', academicMode: enabled });
-            this._view.webview.html = this._getHtmlForWebview(this._latestData, this._history, this._latestReport);
+            this._view.webview.html = this._getHtmlForWebview();
         }
     }
 
@@ -54,7 +71,7 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
         this._optimizationBias = bias;
         if (this._view) {
             this._view.webview.postMessage({ type: 'stateUpdate', optimizationBias: bias });
-            this._view.webview.html = this._getHtmlForWebview(this._latestData, this._history, this._latestReport);
+            this._view.webview.html = this._getHtmlForWebview();
         }
     }
 
@@ -73,6 +90,10 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
         // Handle bidirectional communication between Webview and Extension Backend
         webviewView.webview.onDidReceiveMessage(async (message) => {
             switch (message.command) {
+                case 'analyzeAgain':
+                    vscode.commands.executeCommand('adaptix.analyzeCurrentFile');
+                    break;
+
                 case 'applyRefactor':
                     vscode.commands.executeCommand('adaptix.applyRefactor', message.varName, message.targetStructure);
                     break;
@@ -92,7 +113,7 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
                         const report = await EdgeCaseRunner.runCounterexampleTest(code);
                         this._view?.webview.postMessage({ type: 'edgeCaseResult', payload: report });
                     } catch (err: any) {
-                        vscode.window.showErrorMessage(`Adaptix Edge-Case Runner Error: ${err.message}`);
+                        vscode.window.showErrorMessage(`Adaptix Counterexample Test Error: ${err.message}`);
                     }
                     break;
 
@@ -114,7 +135,9 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
                 case 'setAcademicMode':
                     this._academicMode = !!message.enabled;
                     await vscode.workspace.getConfiguration('adaptix').update('academicMode', this._academicMode, vscode.ConfigurationTarget.Global);
-                    this.update(this._latestData, this._history, this._latestReport);
+                    if (this._view) {
+                        this._view.webview.html = this._getHtmlForWebview();
+                    }
                     break;
 
                 case 'setOptimizationBias':
@@ -219,21 +242,51 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
             }
         });
 
-        this.update(this._latestData, this._history, this._latestReport);
+        this.update(this._latestData, this._history, this._latestReport, this._currentFile);
     }
 
     public update(
         analysisData: Map<string, AnalysisContext>,
         history: AdaptationRecord[] = this._history,
-        unifiedReport?: UnifiedAnalysisReport
+        unifiedReport?: UnifiedAnalysisReport,
+        fileInfo?: FileAnalysisInfo
     ) {
         this._latestData = analysisData;
         this._history = history;
         if (unifiedReport) {
             this._latestReport = unifiedReport;
         }
+        if (fileInfo) {
+            this._currentFile = fileInfo;
+            let findingsCount = 0;
+            analysisData.forEach(ctx => {
+                if (ctx.decision?.suggestedStructure && ctx.decision.suggestedStructure !== ctx.monitor.currentStructure) {
+                    findingsCount++;
+                }
+            });
+            if (unifiedReport?.algorithmStrategy.detectedStrategies) {
+                findingsCount += unifiedReport.algorithmStrategy.detectedStrategies.length;
+            }
+
+            const existingIdx = this._recentAnalyses.findIndex(r => r.filePath === fileInfo.filePath);
+            const record: RecentAnalysisRecord = {
+                fileName: fileInfo.fileName,
+                filePath: fileInfo.filePath,
+                timestamp: fileInfo.lastAnalyzed,
+                findingsCount,
+                status: findingsCount > 0 ? 'Analyzed' : 'Clean'
+            };
+            if (existingIdx >= 0) {
+                this._recentAnalyses[existingIdx] = record;
+            } else {
+                this._recentAnalyses.unshift(record);
+                if (this._recentAnalyses.length > 8) {
+                    this._recentAnalyses.pop();
+                }
+            }
+        }
         if (this._view) {
-            this._view.webview.html = this._getHtmlForWebview(analysisData, history, this._latestReport);
+            this._view.webview.html = this._getHtmlForWebview();
         }
     }
 
@@ -244,109 +297,169 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private _getHtmlForWebview(
-        data: Map<string, AnalysisContext>,
-        history: AdaptationRecord[],
-        report?: UnifiedAnalysisReport
-    ): string {
-        let cardsHtml = '';
+    private _getHtmlForWebview(): string {
+        const data = this._latestData;
+        const report = this._latestReport;
+        const history = this._history;
+        const activeTab = this._activeTab || 'overview';
+        const fileInfo = this._currentFile;
 
+        // Count total findings
+        let optimizableContainersCount = 0;
+        const containerCards: { varName: string; ctx: AnalysisContext }[] = [];
         data.forEach((ctx, varName) => {
-            if (!ctx.decision) return;
-
-            const isOptimizable = ctx.decision.suggestedStructure && ctx.decision.suggestedStructure !== ctx.monitor.currentStructure;
-            const maxRatio = Math.max(ctx.monitor.insertRatio, ctx.monitor.searchRatio, ctx.monitor.deleteRatio);
-            const isDomInsert = ctx.monitor.insertRatio === maxRatio;
-            const isDomSearch = ctx.monitor.searchRatio === maxRatio;
-            const isDomDelete = ctx.monitor.deleteRatio === maxRatio;
-
-            const confClass = ctx.decision.confidenceLabel === 'Strong' ? 'conf-strong' :
-                              ctx.decision.confidenceLabel === 'Moderate' ? 'conf-moderate' : 'conf-low';
-
-            const twoSentence = ctx.decision.twoSentenceSummary || 
-                `${varName} (${ctx.monitor.currentStructure.replace('std::', '')}) exhibits high operation overhead. Switching to ${ctx.decision.suggestedStructure?.replace('std::', '') || 'optimal container'} improves complexity.`;
-
-            const deepExplain = ctx.decision.deepExplanation || ctx.decision.explanation?.primaryReason || 'Detailed theoretical analysis and Master Theorem derivation available in Academic Mode.';
-
-            cardsHtml += `
-            <div class="glass-card">
-                <div class="card-header">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-cyan);">${varName}</span>
-                        <span class="badge current">${ctx.monitor.currentStructure.replace('std::', '')}</span>
-                    </div>
-                    <span style="font-size: 0.65rem; color: var(--text-muted);">${ctx.monitor.totalOperations} ops</span>
-                </div>
-
-                <!-- Ratios Bar -->
-                <div class="progress-bar-container">
-                    <div class="progress-segment insert" style="width: ${ctx.monitor.insertRatio * 100}%;"></div>
-                    <div class="progress-segment search" style="width: ${ctx.monitor.searchRatio * 100}%;"></div>
-                    <div class="progress-segment delete" style="width: ${ctx.monitor.deleteRatio * 100}%;"></div>
-                </div>
-                <div class="progress-labels">
-                    <span>Ins ${(ctx.monitor.insertRatio * 100).toFixed(0)}%</span>
-                    <span>Src ${(ctx.monitor.searchRatio * 100).toFixed(0)}%</span>
-                    <span>Del ${(ctx.monitor.deleteRatio * 100).toFixed(0)}%</span>
-                </div>
-
-                ${isOptimizable ? `
-                <div style="margin-top: 8px; border-top: 1px solid var(--glass-border); padding-top: 8px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                        <span class="badge recommendation">⚡ Target: ${ctx.decision.suggestedStructure?.replace('std::', '')}</span>
-                        <span class="badge ${confClass}">${ctx.decision.confidenceLabel} (${ctx.decision.speedup || 'Faster'})</span>
-                    </div>
-
-                    <!-- Two-Sentence Rule Box -->
-                    <div class="two-sentence-box">
-                        <p class="two-sentence-text">${escapeHtml(twoSentence)}</p>
-                    </div>
-
-                    <!-- Expandable Theoretical Accordion -->
-                    <details class="explain-accordion" ${this._academicMode ? 'open' : ''}>
-                        <summary>Read More / Explain the Math</summary>
-                        <div class="accordion-body">
-                            <pre style="white-space: pre-wrap; font-family: var(--font-sans); font-size: 0.7rem; color: var(--text-secondary);">${escapeHtml(deepExplain)}</pre>
-                            ${ctx.decision.explanation?.tradeoffs && ctx.decision.explanation.tradeoffs.length > 0 ? `
-                                <div style="margin-top: 6px;">
-                                    <strong style="color: var(--accent-orange); font-size: 0.68rem;">Trade-offs:</strong>
-                                    <ul style="margin: 2px 0 0 16px; font-size: 0.65rem;">
-                                        ${ctx.decision.explanation.tradeoffs.map(t => `<li>${escapeHtml(t)}</li>`).join('')}
-                                    </ul>
-                                </div>
-                            ` : ''}
-                        </div>
-                    </details>
-
-                    <div style="display: flex; gap: 6px; margin-top: 8px;">
-                        <button class="btn-action" style="flex: 1;" onclick="applyRefactor('${varName}', '${ctx.decision.suggestedStructure}')">
-                            Apply
-                        </button>
-                        <button class="btn-action success" style="flex: 1;" onclick="openSmartDiff('${varName}', '${ctx.decision.suggestedStructure}')">
-                            Smart Diff
-                        </button>
-                    </div>
-                </div>
-                ` : `
-                <div style="margin-top: 6px; font-size: 0.72rem; color: var(--accent-green);">
-                    ✓ Optimal structure usage detected for observed access pattern.
-                </div>
-                `}
-            </div>`;
+            containerCards.push({ varName, ctx });
+            if (ctx.decision?.suggestedStructure && ctx.decision.suggestedStructure !== ctx.monitor.currentStructure) {
+                optimizableContainersCount++;
+            }
         });
 
-        if (cardsHtml === '') {
-            cardsHtml = `
-            <div class="glass-card" style="text-align: center; padding: 20px;">
-                <p style="font-weight: 600; margin-bottom: 4px;">Listening for C++ Code...</p>
-                <p style="font-size: 0.72rem; color: var(--text-secondary);">Declare containers or recursive functions in your C++ file to activate live intelligence.</p>
-            </div>`;
-        }
+        const strategiesCount = report?.algorithmStrategy.detectedStrategies.length || 0;
+        const totalFindings = optimizableContainersCount + strategiesCount;
 
-        const activeTab = this._activeTab || 'intelligence';
+        // Optimization Strategy display text
         const biasVal = this._optimizationBias === 'memory' ? '0' : this._optimizationBias === 'balanced' ? '1' : '2';
         const biasText = this._optimizationBias === 'memory' ? 'Memory-First [O(1) Space]' :
-                         this._optimizationBias === 'balanced' ? 'Balanced Tradeoff' : 'Speed-First [O(1) Time]';
+                         this._optimizationBias === 'balanced' ? 'Balanced Strategy' : 'Speed-First [O(1) Time]';
+
+        // ────────────── SECTION 1: OVERVIEW ──────────────
+        const recentHistoryRows = this._recentAnalyses.length === 0
+            ? `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 8px;">No analysis sessions recorded yet. Open a C++ file to begin.</td></tr>`
+            : this._recentAnalyses.map(r => `
+                <tr>
+                    <td style="font-weight: 600; color: var(--accent-cyan);">${escapeHtml(r.fileName)}</td>
+                    <td style="color: var(--text-secondary); font-size: 0.65rem;">${r.timestamp}</td>
+                    <td><span class="badge ${r.findingsCount > 0 ? 'conf-moderate' : 'conf-strong'}">${r.findingsCount} Findings</span></td>
+                    <td><span class="badge current">${r.status}</span></td>
+                </tr>
+            `).join('');
+
+        const overviewTopRecHtml = totalFindings > 0
+            ? `
+            <div class="two-sentence-box" style="margin-top: 8px;">
+                <p style="font-weight: 700; color: var(--accent-cyan); font-size: 0.74rem; margin-bottom: 3px;">What Was Found:</p>
+                <p class="two-sentence-text">
+                    ${escapeHtml(report?.executiveSummary.bottleneckHeadline || `${totalFindings} algorithmic and data structure optimization opportunities detected in active buffer.`)}
+                </p>
+                <div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--glass-border); font-size: 0.7rem; color: var(--text-secondary);">
+                    <strong style="color: var(--accent-green);">What To Do Next:</strong>
+                    Inspect <strong>Data Structure Usage</strong> and <strong>Algorithm Patterns</strong> in Code Intelligence, or switch to <strong>Optimization Workflow</strong> to preview side-by-side diffs and apply changes safely.
+                </div>
+            </div>`
+            : `
+            <div class="glass-card" style="margin-top: 8px; text-align: center; padding: 12px;">
+                <span class="badge conf-strong" style="margin-bottom: 6px;">✓ Clean Baseline</span>
+                <p style="font-size: 0.72rem; color: var(--text-secondary);">No severe container bottlenecks or unbounded recursions detected in current file.</p>
+            </div>`;
+
+        // ────────────── SECTION 2: CODE INTELLIGENCE ──────────────
+        let dsUsageHtml = '';
+        if (containerCards.length === 0) {
+            dsUsageHtml = `
+            <div class="glass-card" style="text-align: center; padding: 14px;">
+                <p style="font-weight: 600; font-size: 0.75rem;">Listening for C++ Data Structures...</p>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Declare standard containers (std::vector, std::map, std::set) in active C++ code to analyze usage.</p>
+            </div>`;
+        } else {
+            containerCards.forEach(({ varName, ctx }) => {
+                const isOptimizable = ctx.decision?.suggestedStructure && ctx.decision.suggestedStructure !== ctx.monitor.currentStructure;
+                const confClass = ctx.decision?.confidenceLabel === 'Strong' ? 'conf-strong' :
+                                  ctx.decision?.confidenceLabel === 'Moderate' ? 'conf-moderate' : 'conf-low';
+                const twoSentence = ctx.decision?.twoSentenceSummary ||
+                    `${varName} (${ctx.monitor.currentStructure.replace('std::', '')}) exhibits high operation overhead. Switching to ${ctx.decision?.suggestedStructure?.replace('std::', '') || 'optimal container'} improves complexity.`;
+                const deepExplain = ctx.decision?.deepExplanation || ctx.decision?.explanation?.primaryReason || 'Detailed theoretical analysis and asymptotic trade-offs available.';
+
+                dsUsageHtml += `
+                <div class="glass-card">
+                    <div class="card-header">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-cyan); font-size: 0.78rem;">${escapeHtml(varName)}</span>
+                            <span class="badge current">${ctx.monitor.currentStructure.replace('std::', '')}</span>
+                        </div>
+                        <span style="font-size: 0.65rem; color: var(--text-muted);">${ctx.monitor.totalOperations} ops tracked</span>
+                    </div>
+
+                    <!-- Workload Distribution -->
+                    <div class="progress-bar-container">
+                        <div class="progress-segment insert" style="width: ${ctx.monitor.insertRatio * 100}%;"></div>
+                        <div class="progress-segment search" style="width: ${ctx.monitor.searchRatio * 100}%;"></div>
+                        <div class="progress-segment delete" style="width: ${ctx.monitor.deleteRatio * 100}%;"></div>
+                    </div>
+                    <div class="progress-labels">
+                        <span>Ins ${(ctx.monitor.insertRatio * 100).toFixed(0)}%</span>
+                        <span>Src ${(ctx.monitor.searchRatio * 100).toFixed(0)}%</span>
+                        <span>Del ${(ctx.monitor.deleteRatio * 100).toFixed(0)}%</span>
+                    </div>
+
+                    ${isOptimizable ? `
+                    <div style="margin-top: 8px; border-top: 1px solid var(--glass-border); padding-top: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <span class="badge recommendation">⚡ Target: ${ctx.decision?.suggestedStructure?.replace('std::', '')}</span>
+                            <span class="badge ${confClass}">${ctx.decision?.confidenceLabel} (${ctx.decision?.speedup || 'Faster'})</span>
+                        </div>
+                        <div class="two-sentence-box">
+                            <p class="two-sentence-text">${escapeHtml(twoSentence)}</p>
+                        </div>
+                        <details class="explain-accordion" ${this._academicMode ? 'open' : ''}>
+                            <summary>Read More / Theoretical Trade-offs</summary>
+                            <div class="accordion-body">
+                                <p style="font-size: 0.7rem; color: var(--text-secondary); line-height: 1.4;">${escapeHtml(deepExplain)}</p>
+                                ${ctx.decision?.explanation?.tradeoffs && ctx.decision.explanation.tradeoffs.length > 0 ? `
+                                    <div style="margin-top: 6px;">
+                                        <strong style="color: var(--accent-orange); font-size: 0.68rem;">Trade-offs:</strong>
+                                        <ul style="margin: 2px 0 0 16px; font-size: 0.65rem; color: var(--text-secondary);">
+                                            ${ctx.decision.explanation.tradeoffs.map(t => `<li>${escapeHtml(t)}</li>`).join('')}
+                                        </ul>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </details>
+                    </div>
+                    ` : `
+                    <div style="margin-top: 6px; font-size: 0.7rem; color: var(--accent-green);">
+                        ✓ Optimal data structure usage for observed access patterns.
+                    </div>
+                    `}
+                </div>`;
+            });
+        }
+
+        // Algorithm Patterns
+        let algoPatternsHtml = '';
+        if (!report || report.algorithmStrategy.detectedStrategies.length === 0) {
+            algoPatternsHtml = `
+            <div class="glass-card" style="text-align: center; padding: 12px;">
+                <p style="font-size: 0.72rem; color: var(--text-muted);">No distinct algorithmic paradigm bottlenecks detected in current functions.</p>
+            </div>`;
+        } else {
+            report.algorithmStrategy.detectedStrategies.forEach(s => {
+                const isConfirmed = s.confidenceLabel === 'Strong';
+                algoPatternsHtml += `
+                <div class="glass-card">
+                    <div class="card-header">
+                        <span class="card-title" style="color: var(--accent-purple); font-size: 0.76rem;">${s.detectedParadigm.replace('_', ' ').toUpperCase()}</span>
+                        <span class="badge ${isConfirmed ? 'conf-strong' : 'conf-moderate'}">${isConfirmed ? 'Confirmed Detection' : 'Heuristic Estimate'}</span>
+                    </div>
+                    <p style="font-size: 0.72rem; color: var(--text-primary); margin-bottom: 4px;">${escapeHtml(s.primaryReason)}</p>
+                    <div style="font-size: 0.68rem; color: var(--text-secondary); margin-top: 4px;">
+                        <span>Recurrence: <code style="color: var(--accent-cyan);">${escapeHtml(s.recurrenceRelation || 'N/A')}</code></span>
+                        ${report.algorithmStrategy.hasOverlappingSubproblems ? ' | <span style="color: var(--accent-orange); font-weight: 600;">Overlapping Subproblems</span>' : ''}
+                    </div>
+                </div>`;
+            });
+        }
+
+        // ────────────── SECTION 3: OPTIMIZATION WORKFLOW ──────────────
+        const primaryOpt = containerCards.find(c => c.ctx.decision?.suggestedStructure && c.ctx.decision.suggestedStructure !== c.ctx.monitor.currentStructure);
+        const optVarName = primaryOpt ? primaryOpt.varName : 'activeOrderIds';
+        const optCurrentDS = primaryOpt ? primaryOpt.ctx.monitor.currentStructure : 'std::vector';
+        const optTargetDS = primaryOpt ? (primaryOpt.ctx.decision?.suggestedStructure || 'std::unordered_set') : 'std::unordered_set';
+
+        // ────────────── SECTION 4: BENCHMARK LAB ──────────────
+        // Section 4 HTML is interactive via Webview JS and BeforeAfterRunner
+
+        // ────────────── SECTION 5: LEARN & EXPLORE ──────────────
+        // Section 5 HTML is interactive via Webview JS and TraceGenerators
 
         return `<!DOCTYPE html>
 <html lang="en">
@@ -378,10 +491,11 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
         body { font-family: var(--font-sans); background: var(--bg-base); color: var(--text-primary); padding: 8px; font-size: 13px; line-height: 1.45; overflow-x: hidden; }
         
         .brand-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12)); border: 1px solid var(--glass-border); border-radius: 8px; margin-bottom: 10px; }
-        .brand-title { display: flex; align-items: center; gap: 8px; }
-        .brand-logo-text { font-weight: 800; font-size: 1rem; letter-spacing: 1.5px; color: var(--accent-cyan); }
-        .brand-badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 12px; background: rgba(56, 189, 248, 0.2); color: var(--accent-cyan); border: 1px solid rgba(56, 189, 248, 0.35); font-weight: 700; }
-        
+        .brand-title { display: flex; flex-direction: column; }
+        .brand-logo-text { font-weight: 800; font-size: 0.95rem; letter-spacing: 1.2px; color: var(--accent-cyan); display: flex; align-items: center; gap: 6px; }
+        .brand-badge { font-size: 0.6rem; padding: 1px 5px; border-radius: 10px; background: rgba(56, 189, 248, 0.2); color: var(--accent-cyan); border: 1px solid rgba(56, 189, 248, 0.35); font-weight: 700; }
+        .brand-subtext { font-size: 0.65rem; color: var(--text-muted); margin-top: 1px; }
+
         .academic-toggle-container { display: flex; align-items: center; gap: 6px; font-size: 0.68rem; color: var(--text-secondary); cursor: pointer; }
         .switch { position: relative; display: inline-block; width: 32px; height: 16px; }
         .switch input { opacity: 0; width: 0; height: 0; }
@@ -390,8 +504,10 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
         input:checked + .slider { background-color: var(--accent-purple); }
         input:checked + .slider:before { transform: translateX(16px); }
 
-        .nav-tabs { display: flex; gap: 4px; margin-bottom: 10px; border-bottom: 1px solid var(--glass-border); padding-bottom: 6px; }
-        .nav-tab { flex: 1; text-align: center; padding: 6px 8px; background: rgba(255, 255, 255, 0.03); color: var(--text-secondary); border: 1px solid transparent; border-radius: 6px; cursor: pointer; font-size: 0.72rem; font-weight: 600; transition: all 0.15s ease; white-space: nowrap; }
+        /* Exactly 5 Primary Tabs + 1 Hidden Advanced */
+        .nav-tabs { display: flex; gap: 3px; margin-bottom: 10px; border-bottom: 1px solid var(--glass-border); padding-bottom: 6px; overflow-x: auto; scrollbar-width: none; }
+        .nav-tabs::-webkit-scrollbar { display: none; }
+        .nav-tab { flex: 1; text-align: center; padding: 5px 6px; background: rgba(255, 255, 255, 0.03); color: var(--text-secondary); border: 1px solid transparent; border-radius: 6px; cursor: pointer; font-size: 0.68rem; font-weight: 600; transition: all 0.15s ease; white-space: nowrap; }
         .nav-tab:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.07); }
         .nav-tab.active { color: var(--accent-cyan); background: rgba(56, 189, 248, 0.14); border-color: rgba(56, 189, 248, 0.35); }
         .nav-tab.academic-tab { color: var(--accent-purple); }
@@ -402,9 +518,9 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
 
         .glass-card { background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; backdrop-filter: blur(10px); }
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-        .card-title { font-size: 0.8rem; font-weight: 700; color: var(--text-primary); }
+        .card-title { font-size: 0.78rem; font-weight: 700; color: var(--text-primary); }
 
-        .badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 700; display: inline-flex; }
+        .badge { font-size: 0.62rem; padding: 2px 6px; border-radius: 4px; font-weight: 700; display: inline-flex; align-items: center; gap: 3px; }
         .badge.current { background: rgba(255, 255, 255, 0.1); color: var(--text-primary); }
         .badge.recommendation { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); border: 1px solid rgba(34, 197, 94, 0.35); }
         .badge.conf-strong { background: rgba(34, 197, 94, 0.15); color: var(--accent-green); }
@@ -412,17 +528,31 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
         .badge.conf-low { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); }
         .badge.academic { background: rgba(168, 85, 247, 0.2); color: var(--accent-purple); }
 
-        .bias-slider-container { background: rgba(0, 0, 0, 0.25); border: 1px solid var(--glass-border); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
-        .bias-range-input { width: 100%; -webkit-appearance: none; height: 5px; border-radius: 3px; background: linear-gradient(to right, #3b82f6, #a855f7, #22c55e); outline: none; margin: 6px 0; }
-        .bias-range-input::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #ffffff; cursor: pointer; border: 2px solid var(--accent-cyan); }
-        .bias-labels { display: flex; justify-content: space-between; font-size: 0.62rem; color: var(--text-secondary); }
-
         .two-sentence-box { background: rgba(56, 189, 248, 0.08); border-left: 3px solid var(--accent-cyan); padding: 8px 10px; border-radius: 4px; margin: 6px 0; }
-        .two-sentence-text { font-size: 0.74rem; color: var(--text-primary); line-height: 1.4; }
+        .two-sentence-text { font-size: 0.72rem; color: var(--text-primary); line-height: 1.4; }
 
         details.explain-accordion { margin-top: 6px; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--glass-border); border-radius: 6px; }
-        details.explain-accordion summary { padding: 6px 8px; font-size: 0.68rem; font-weight: 600; color: var(--accent-cyan); cursor: pointer; user-select: none; }
+        details.explain-accordion summary { padding: 5px 8px; font-size: 0.68rem; font-weight: 600; color: var(--accent-cyan); cursor: pointer; user-select: none; }
         .accordion-body { padding: 8px; font-size: 0.7rem; color: var(--text-secondary); border-top: 1px solid var(--glass-border); }
+
+        .btn-action { background: rgba(56, 189, 248, 0.15); color: var(--accent-cyan); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 5px; padding: 6px 10px; font-size: 0.7rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+        .btn-action:hover { background: rgba(56, 189, 248, 0.25); }
+        .btn-action.success { background: rgba(34, 197, 94, 0.15); color: var(--accent-green); border-color: rgba(34, 197, 94, 0.35); }
+        .btn-action.success:hover { background: rgba(34, 197, 94, 0.25); }
+        .btn-action.purple { background: rgba(168, 85, 247, 0.15); color: var(--accent-purple); border-color: rgba(168, 85, 247, 0.35); }
+        .btn-action.purple:hover { background: rgba(168, 85, 247, 0.25); }
+        .btn-action.danger { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); border-color: rgba(239, 68, 68, 0.35); }
+
+        .progress-bar-container { height: 5px; background: rgba(255, 255, 255, 0.06); border-radius: 3px; display: flex; overflow: hidden; margin: 6px 0; }
+        .progress-segment.insert { background: #3b82f6; }
+        .progress-segment.search { background: #22c55e; }
+        .progress-segment.delete { background: #ef4444; }
+        .progress-labels { display: flex; justify-content: space-between; font-size: 0.62rem; color: var(--text-secondary); }
+
+        .bias-slider-container { background: rgba(0, 0, 0, 0.25); border: 1px solid var(--glass-border); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
+        .bias-range-input { width: 100%; -webkit-appearance: none; height: 5px; border-radius: 3px; background: linear-gradient(to right, #3b82f6, #a855f7, #22c55e); outline: none; margin: 6px 0; }
+        .bias-range-input::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%; background: #ffffff; cursor: pointer; border: 2px solid var(--accent-cyan); }
+        .bias-labels { display: flex; justify-content: space-between; font-size: 0.62rem; color: var(--text-secondary); }
 
         .timeline-range { width: 100%; -webkit-appearance: none; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); outline: none; cursor: pointer; }
         .timeline-range::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%; background: var(--accent-cyan); cursor: pointer; }
@@ -430,17 +560,6 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
         .btn-icon { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); color: var(--text-primary); padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; cursor: pointer; }
         .btn-icon:hover { background: rgba(255, 255, 255, 0.12); color: var(--accent-cyan); }
         .speed-select { background: rgba(0, 0, 0, 0.3); border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 4px 6px; border-radius: 4px; font-size: 0.68rem; outline: none; }
-
-        .btn-action { background: rgba(56, 189, 248, 0.15); color: var(--accent-cyan); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 5px; padding: 6px 10px; font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-        .btn-action:hover { background: rgba(56, 189, 248, 0.25); }
-        .btn-action.success { background: rgba(34, 197, 94, 0.15); color: var(--accent-green); border-color: rgba(34, 197, 94, 0.35); }
-        .btn-action.purple { background: rgba(168, 85, 247, 0.15); color: var(--accent-purple); border-color: rgba(168, 85, 247, 0.35); }
-
-        .progress-bar-container { height: 5px; background: rgba(255, 255, 255, 0.06); border-radius: 3px; display: flex; overflow: hidden; margin: 6px 0; }
-        .progress-segment.insert { background: #3b82f6; }
-        .progress-segment.search { background: #22c55e; }
-        .progress-segment.delete { background: #ef4444; }
-        .progress-labels { display: flex; justify-content: space-between; font-size: 0.62rem; color: var(--text-secondary); }
 
         .dp-table-container { overflow-x: auto; margin: 8px 0; max-height: 200px; border: 1px solid var(--glass-border); border-radius: 6px; }
         .dp-grid { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 0.68rem; text-align: center; }
@@ -450,20 +569,28 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
         .dp-grid td.dep-cell { background: rgba(168, 85, 247, 0.25); color: #e9d5ff; }
         .dp-grid td.reconstructed-cell { background: rgba(34, 197, 94, 0.3); color: var(--accent-green); font-weight: bold; }
 
+        .diff-container { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; font-family: var(--font-mono); font-size: 0.68rem; }
+        .diff-block { padding: 6px 8px; border-radius: 4px; border: 1px solid var(--glass-border); overflow-x: auto; white-space: pre; }
+        .diff-del { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border-color: rgba(239, 68, 68, 0.3); }
+        .diff-add { background: rgba(34, 197, 94, 0.15); color: #86efac; border-color: rgba(34, 197, 94, 0.3); }
+
         .chart-box { width: 100%; background: rgba(0, 0, 0, 0.35); border: 1px solid var(--glass-border); border-radius: 6px; margin: 6px 0; }
-        pre.code-snippet { font-family: var(--font-mono); font-size: 0.68rem; background: rgba(0, 0, 0, 0.45); border: 1px solid var(--glass-border); border-radius: 6px; padding: 6px 8px; overflow-x: auto; color: #e2e8f0; }
+        .step-num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--accent-cyan); color: #000; font-weight: bold; font-size: 0.65rem; margin-right: 6px; }
     </style>
 </head>
 <body>
-    <!-- Top Header -->
+    <!-- Top Header with Ownership Branding -->
     <div class="brand-header">
         <div class="brand-title">
-            <span class="brand-logo-text">ADAPTIX</span>
-            <span class="brand-badge">3.0 PRO</span>
+            <div class="brand-logo-text">
+                <span>ADAPTIX</span>
+                <span class="brand-badge">3.0 PRO</span>
+            </div>
+            <div class="brand-subtext">Asmit Bhorade &bull; Algorithm Intelligence Engine</div>
         </div>
         <div class="header-controls">
-            <label class="academic-toggle-container">
-                <span>Academic Mode</span>
+            <label class="academic-toggle-container" title="Toggle Advanced Academic Mode (NP-Completeness, Nature Lab, Mathematical Derivations)">
+                <span>Advanced Mode</span>
                 <div class="switch">
                     <input type="checkbox" id="academicModeCheckbox" ${this._academicMode ? 'checked' : ''} onchange="toggleAcademicMode()">
                     <span class="slider"></span>
@@ -472,16 +599,22 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
         </div>
     </div>
 
-    <!-- 3-Pillar Navigation Tabs -->
+    <!-- Exactly 5 Primary Navigation Tabs + 1 Hidden Advanced Section -->
     <div class="nav-tabs">
+        <button class="nav-tab ${activeTab === 'overview' ? 'active' : ''}" data-tab="overview" onclick="selectTab('overview')">
+            🏠 Overview
+        </button>
         <button class="nav-tab ${activeTab === 'intelligence' ? 'active' : ''}" data-tab="intelligence" onclick="selectTab('intelligence')">
-            🧠 Intelligence
+            🧠 Code Intelligence
         </button>
-        <button class="nav-tab ${activeTab === 'performance' ? 'active' : ''}" data-tab="performance" onclick="selectTab('performance')">
-            ⚡ Performance
+        <button class="nav-tab ${activeTab === 'optimization' ? 'active' : ''}" data-tab="optimization" onclick="selectTab('optimization')">
+            ⚡ Optimization Workflow
         </button>
-        <button class="nav-tab ${activeTab === 'visualizer' ? 'active' : ''}" data-tab="visualizer" onclick="selectTab('visualizer')">
-            🔬 Visualizer
+        <button class="nav-tab ${activeTab === 'benchmark' ? 'active' : ''}" data-tab="benchmark" onclick="selectTab('benchmark')">
+            📊 Benchmark Lab
+        </button>
+        <button class="nav-tab ${activeTab === 'learn' ? 'active' : ''}" data-tab="learn" onclick="selectTab('learn')">
+            🔬 Learn & Explore
         </button>
         <button id="academicNavTab" class="nav-tab academic-tab ${activeTab === 'academic' ? 'active' : ''}" data-tab="academic" style="display: ${this._academicMode ? 'block' : 'none'};" onclick="selectTab('academic')">
             🎓 Academic Lab
@@ -489,63 +622,252 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
     </div>
 
     <!-- ───────────────────────────────────────────────────────────── -->
-    <!-- TAB 1: CODE INTELLIGENCE -->
+    <!-- SECTION 1: OVERVIEW (LANDING PAGE) -->
     <!-- ───────────────────────────────────────────────────────────── -->
-    <div id="tab-intelligence" class="tab-panel ${activeTab === 'intelligence' ? 'active' : ''}">
+    <div id="tab-overview" class="tab-panel ${activeTab === 'overview' ? 'active' : ''}">
+        <!-- File & Status Card -->
         <div class="glass-card">
             <div class="card-header">
-                <span class="card-title">Live Analysis Status</span>
-                <span class="badge conf-strong">Active</span>
+                <div>
+                    <span class="card-title" style="display: block;">Active File Status</span>
+                    <span style="font-size: 0.68rem; color: var(--accent-cyan); font-family: var(--font-mono);">${fileInfo ? escapeHtml(fileInfo.fileName) : 'No C++ file active'}</span>
+                </div>
+                <button class="btn-action" onclick="analyzeAgain()">🔄 Analyze Again</button>
             </div>
-            <p style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 6px;">
-                ${report?.executiveSummary.bottleneckHeadline || 'Keystroke AST listener actively inspecting active C++ editor.'}
-            </p>
+            <div style="display: flex; gap: 8px; margin-top: 6px; font-size: 0.68rem; color: var(--text-secondary);">
+                <span>Status: <strong style="color: ${totalFindings > 0 ? 'var(--accent-orange)' : 'var(--accent-green)'};">${totalFindings > 0 ? totalFindings + ' Optimizations Found' : 'Ready / Clean'}</strong></span>
+                <span>&bull;</span>
+                <span>Analyzed: ${fileInfo ? fileInfo.lastAnalyzed : 'Awaiting file open'}</span>
+            </div>
+            ${overviewTopRecHtml}
         </div>
 
-        <!-- Rendered Container Cards -->
-        <div id="containerCardsContainer">
-            ${cardsHtml}
-        </div>
-
-        <!-- Edge-Case Counterexample Display Box -->
-        <div id="edgeCaseResultBox" style="display: none; margin-bottom: 10px;"></div>
-
-        <!-- Quick Actions Card -->
+        <!-- Recent Analysis History Card -->
         <div class="glass-card">
-            <span class="card-title" style="display: block; margin-bottom: 6px;">Automated Algorithmic Actions</span>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-                <button class="btn-action" onclick="injectTemplate('dynamic_programming_tab')">Inject DP Skeleton</button>
-                <button class="btn-action" onclick="injectTemplate('two_pointers')">Two-Pointers</button>
-                <button class="btn-action purple" onclick="runEdgeCaseTest('coin_change')">Run Counterexample</button>
-                <button class="btn-action success" onclick="runBeforeAfterBenchmark('arr', 'std::vector', 'std::unordered_set')">Benchmark Refactor</button>
+            <div class="card-header">
+                <span class="card-title">Recent Analysis History</span>
+                <span style="font-size: 0.62rem; color: var(--text-muted);">Session Memory</span>
             </div>
+            <table class="dp-grid" style="margin-top: 4px;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left;">File</th>
+                        <th>Time</th>
+                        <th>Findings</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${recentHistoryRows}
+                </tbody>
+            </table>
+            <p style="font-size: 0.62rem; color: var(--text-muted); margin-top: 6px; text-align: right;">
+                * In-memory session history resets when VS Code reloads.
+            </p>
         </div>
     </div>
 
     <!-- ───────────────────────────────────────────────────────────── -->
-    <!-- TAB 2: PERFORMANCE LAB -->
+    <!-- SECTION 2: CODE INTELLIGENCE -->
     <!-- ───────────────────────────────────────────────────────────── -->
-    <div id="tab-performance" class="tab-panel ${activeTab === 'performance' ? 'active' : ''}">
-        <!-- Space vs Time Slider -->
+    <div id="tab-intelligence" class="tab-panel ${activeTab === 'intelligence' ? 'active' : ''}">
+        <!-- Optimization Strategy Control -->
         <div class="bias-slider-container">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 0.72rem;">
-                <strong>Space vs. Time Bias:</strong>
+                <strong>Optimization Strategy:</strong>
                 <span id="biasCurrentLabel" style="color: var(--accent-cyan); font-weight: 700;">${biasText}</span>
             </div>
             <input type="range" id="biasRangeInput" class="bias-range-input" min="0" max="2" step="1" value="${biasVal}" oninput="onBiasSliderChange(this.value)">
             <div class="bias-labels">
-                <span>Memory-First [O(1)]</span>
+                <span>Memory-First [O(1) Space]</span>
                 <span>Balanced</span>
                 <span>Speed-First [O(1) Time]</span>
             </div>
         </div>
 
-        <!-- Before/After Benchmark Container -->
-        <div id="beforeAfterResultBox" style="display: none; margin-bottom: 10px;"></div>
+        <!-- Data Structure Usage -->
+        <div style="margin-bottom: 8px;">
+            <div class="card-header" style="margin-bottom: 4px;">
+                <span class="card-title">Data Structure Usage</span>
+                <span class="badge current">${containerCards.length} Tracked</span>
+            </div>
+            ${dsUsageHtml}
+        </div>
 
-        <!-- Benchmark Runner -->
+        <!-- Algorithm Patterns -->
+        <div style="margin-bottom: 8px;">
+            <div class="card-header" style="margin-bottom: 4px;">
+                <span class="card-title">Algorithm Patterns</span>
+                <span class="badge current">${strategiesCount} Patterns</span>
+            </div>
+            ${algoPatternsHtml}
+        </div>
+
+        <!-- Complexity Analysis -->
         <div class="glass-card">
-            <span class="card-title" style="display: block; margin-bottom: 4px;">Empirical Benchmark Runner</span>
+            <div class="card-header">
+                <span class="card-title">Complexity Analysis</span>
+                <span class="badge conf-strong">Asymptotic Model</span>
+            </div>
+            <p style="font-size: 0.72rem; color: var(--text-primary); margin-bottom: 6px;">
+                Time and space bounds derived via static AST analysis and loop nesting depth extraction:
+            </p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 0.68rem;">
+                <div style="background: rgba(0,0,0,0.25); padding: 6px; border-radius: 4px;">
+                    <div style="color: var(--accent-cyan); font-weight: 700;">Time Complexity</div>
+                    <div style="color: var(--text-secondary); margin-top: 2px;">Worst Case: <code style="color: #fca5a5;">${optimizableContainersCount > 0 ? 'O(N²) Quadratic' : 'O(N) Linear'}</code></div>
+                    <div style="color: var(--text-secondary);">Average: <code style="color: #fde047;">${optimizableContainersCount > 0 ? 'O(N) to O(N²)' : 'O(N)'}</code></div>
+                </div>
+                <div style="background: rgba(0,0,0,0.25); padding: 6px; border-radius: 4px;">
+                    <div style="color: var(--accent-green); font-weight: 700;">Space Complexity</div>
+                    <div style="color: var(--text-secondary); margin-top: 2px;">Auxiliary: <code style="color: #86efac;">O(1) to O(N)</code></div>
+                    <div style="color: var(--text-secondary);">Stack Depth: <code style="color: #86efac;">${strategiesCount > 0 ? 'O(N) Recursive' : 'O(1) Iterative'}</code></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <!-- SECTION 3: OPTIMIZATION WORKFLOW -->
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <div id="tab-optimization" class="tab-panel ${activeTab === 'optimization' ? 'active' : ''}">
+        <div class="glass-card">
+            <div class="card-header">
+                <span class="card-title">Step-by-Step Optimization Workflow</span>
+                <span class="badge recommendation">Safe Refactoring</span>
+            </div>
+            <p style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 8px;">
+                Walk through identified opportunities, inspect problem diagnostics, review proposed code diffs, and apply optimizations with confirmation.
+            </p>
+
+            <!-- Step 1: Suggested Improvement -->
+            <div style="margin-bottom: 10px;">
+                <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-cyan); margin-bottom: 2px;">
+                    <span class="step-num">1</span> Suggested Improvement
+                </div>
+                <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 4px; font-size: 0.7rem;">
+                    Migrate <code>${escapeHtml(optVarName)}</code> from <strong style="color: #fca5a5;">${escapeHtml(optCurrentDS)}</strong> to <strong style="color: var(--accent-green);">${escapeHtml(optTargetDS)}</strong>
+                </div>
+            </div>
+
+            <!-- Step 2: The Problem -->
+            <div style="margin-bottom: 10px;">
+                <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-orange); margin-bottom: 2px;">
+                    <span class="step-num">2</span> The Problem (Why It Degrades Performance)
+                </div>
+                <p style="font-size: 0.7rem; color: var(--text-secondary); background: rgba(0,0,0,0.2); padding: 6px 8px; border-radius: 4px;">
+                    Inside the processing loop, <code>.erase()</code> on contiguous memory forces a linear shift of all following elements. Repeated within a loop, this turns an intended linear filter into an O(N²) quadratic bottleneck.
+                </p>
+            </div>
+
+            <!-- Step 3: The Alternative -->
+            <div style="margin-bottom: 10px;">
+                <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-green); margin-bottom: 2px;">
+                    <span class="step-num">3</span> The Alternative (Why It Resolves The Issue)
+                </div>
+                <p style="font-size: 0.7rem; color: var(--text-secondary); background: rgba(0,0,0,0.2); padding: 6px 8px; border-radius: 4px;">
+                    <code>${escapeHtml(optTargetDS)}</code> implements hash-bucket key lookups and unlinked node erasures, achieving O(1) amortized deletion without shifting sibling elements.
+                </p>
+            </div>
+
+            <!-- Step 4: Expected Complexity Changes -->
+            <div style="margin-bottom: 10px;">
+                <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-purple); margin-bottom: 2px;">
+                    <span class="step-num">4</span> Expected Complexity Changes
+                </div>
+                <table class="dp-grid">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Before (${escapeHtml(optCurrentDS.replace('std::', ''))})</th>
+                            <th>After (${escapeHtml(optTargetDS.replace('std::', ''))})</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Batch Erase</td>
+                            <td style="color: #fca5a5;">O(N²) Quadratic</td>
+                            <td style="color: var(--accent-green); font-weight: bold;">O(N) Linear</td>
+                        </tr>
+                        <tr>
+                            <td>Duplicate Check</td>
+                            <td style="color: #fca5a5;">O(N) std::find</td>
+                            <td style="color: var(--accent-green); font-weight: bold;">O(1) .count()</td>
+                        </tr>
+                        <tr>
+                            <td>Auxiliary Space</td>
+                            <td style="color: #86efac;">O(1) overhead</td>
+                            <td style="color: #fde047;">O(N) hash table</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Step 5 & 6: Proposed Code & Diff Preview -->
+            <div style="margin-bottom: 10px;">
+                <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-cyan); margin-bottom: 2px;">
+                    <span class="step-num">5</span> Before / After Diff Preview
+                </div>
+                <div class="diff-container">
+                    <div class="diff-block diff-del">- ${escapeHtml(optCurrentDS)}&lt;int&gt; ${escapeHtml(optVarName)};
+- ${escapeHtml(optVarName)}.push_back(orderId);
+- auto it = std::find(${escapeHtml(optVarName)}.begin(), ${escapeHtml(optVarName)}.end(), id);
+- ${escapeHtml(optVarName)}.erase(it);</div>
+                    <div class="diff-block diff-add">+ ${escapeHtml(optTargetDS)}&lt;int&gt; ${escapeHtml(optVarName)};
++ ${escapeHtml(optVarName)}.insert(orderId);
++ bool exists = ${escapeHtml(optVarName)}.count(id) &gt; 0;
++ ${escapeHtml(optVarName)}.erase(id);</div>
+                </div>
+                <button class="btn-action" style="width: 100%; margin-top: 4px;" onclick="openSmartDiff('${optVarName}', '${optTargetDS}')">
+                    🔍 Open Side-by-Side Smart Diff in VS Code
+                </button>
+            </div>
+
+            <!-- Step 7: Explicit User Confirmation & Apply -->
+            <div>
+                <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-green); margin-bottom: 4px;">
+                    <span class="step-num">6</span> Confirm & Apply Optimization
+                </div>
+                <p style="font-size: 0.68rem; color: var(--text-muted); margin-bottom: 6px;">
+                    Safety Guarantee: Changes are never silently applied. Comments, namespaces, includes, and unrelated functions are preserved.
+                </p>
+                <div style="display: flex; gap: 6px;">
+                    <button class="btn-action success" style="flex: 1;" onclick="applyRefactor('${optVarName}', '${optTargetDS}')">
+                        ✓ Confirm & Apply Changes
+                    </button>
+                    <button class="btn-action purple" style="flex: 1;" onclick="injectTemplate('dynamic_programming_tab')">
+                        🛠️ Inject DP Skeleton
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <!-- SECTION 4: BENCHMARK LAB -->
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <div id="tab-benchmark" class="tab-panel ${activeTab === 'benchmark' ? 'active' : ''}">
+        <!-- Closed-Loop Before/After Optimization Runner -->
+        <div class="glass-card">
+            <div class="card-header">
+                <span class="card-title">Before vs. After Optimization Benchmark</span>
+                <span class="badge conf-strong">Real -O2 Execution</span>
+            </div>
+            <p style="font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 6px;">
+                Compiles user code against proposed optimized container using native g++ with -O2 optimization. Executes in child process with wall-clock timing.
+            </p>
+            <button class="btn-action success" style="width: 100%;" onclick="runBeforeAfterBenchmark('${optVarName}', '${optCurrentDS}', '${optTargetDS}')">
+                ⚡ Run Measured Before/After Benchmark
+            </button>
+            <div id="beforeAfterResultBox" style="display: none; margin-top: 8px;"></div>
+        </div>
+
+        <!-- Empirical Measured Performance Suites -->
+        <div class="glass-card">
+            <div class="card-header">
+                <span class="card-title">Standard Algorithm Benchmark Suite</span>
+                <span class="badge current">Measured Performance</span>
+            </div>
             <div style="display: flex; gap: 4px; margin-bottom: 6px;">
                 <select id="benchSuite" class="speed-select" style="flex: 2;">
                     <option value="sorting">Sorting Suite (Bubble vs Merge vs Quick)</option>
@@ -559,7 +881,9 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
                     <option value="duplicate_heavy">Duplicates</option>
                 </select>
             </div>
-            <button class="btn-action" style="width: 100%;" onclick="triggerBenchmarkSuite()">Run Controlled Benchmark</button>
+            <button class="btn-action" style="width: 100%;" onclick="triggerBenchmarkSuite()">
+                ▶ Run Benchmark Suite
+            </button>
         </div>
 
         <div id="benchmarkResultContainer" style="display: none;" class="glass-card">
@@ -568,30 +892,29 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
             </div>
             <div id="benchmarkSummary" style="font-size: 0.7rem; color: var(--text-primary); margin-bottom: 6px; background: rgba(0,0,0,0.25); padding: 6px; border-radius: 4px;"></div>
             <div id="benchmarkTableContainer" class="dp-table-container"></div>
+            <p style="font-size: 0.62rem; color: var(--text-muted); margin-top: 4px;">
+                Safety guarantee: Executed via external worker process with timeout killing. Zero simulated numbers.
+            </p>
         </div>
-
-        <!-- History & Reports Drawer -->
-        <details class="explain-accordion" style="margin-top: 8px;">
-            <summary>📜 Session Adaptation History & Reports</summary>
-            <div class="accordion-body">
-                ${history.length === 0 ? '<p style="color: var(--text-muted); font-size: 0.7rem;">No refactorings recorded yet.</p>' : 
-                    history.map(h => `<div style="padding: 4px 0; border-bottom: 1px solid var(--glass-border); font-size: 0.68rem;">
-                        <strong>${h.from} → ${h.to}</strong>: ${h.reason} (${h.time})
-                    </div>`).join('')
-                }
-            </div>
-        </details>
     </div>
 
     <!-- ───────────────────────────────────────────────────────────── -->
-    <!-- TAB 3: VISUAL DEBUGGER WITH TIMELINE SCRUBBER -->
+    <!-- SECTION 5: LEARN & EXPLORE -->
     <!-- ───────────────────────────────────────────────────────────── -->
-    <div id="tab-visualizer" class="tab-panel ${activeTab === 'visualizer' ? 'active' : ''}">
+    <div id="tab-learn" class="tab-panel ${activeTab === 'learn' ? 'active' : ''}">
         <div class="glass-card">
             <div class="card-header">
-                <span class="card-title">Timeline Algorithm Scrubber</span>
-                <span id="vizFrameCounter" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent-cyan);">Frame 0 of 0</span>
+                <div>
+                    <span class="card-title">Step-by-Step Visualization</span>
+                    <div style="margin-top: 2px;">
+                        <span class="badge conf-moderate">📚 Educational Simulation (Predefined Canonical Trace)</span>
+                    </div>
+                </div>
+                <span id="vizFrameCounter" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--accent-cyan);">Frame 0 of 0</span>
             </div>
+            <p style="font-size: 0.68rem; color: var(--text-muted); margin-bottom: 8px;">
+                Canonical algorithmic trace for interactive study of recurrence relations, tree pruning, and state tables.
+            </p>
 
             <div style="display: flex; gap: 4px; margin-bottom: 8px;">
                 <select id="vizPresetSelect" class="speed-select" style="flex: 1;" onchange="loadSelectedTrace()">
@@ -604,10 +927,10 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
                 <button class="btn-action" onclick="loadSelectedTrace()">Load</button>
             </div>
 
-            <!-- Scrubber Range Slider -->
+            <!-- Timeline Scrubber -->
             <input type="range" id="vizTimelineScrubber" class="timeline-range" min="0" max="0" value="0" oninput="scrubToFrame(this.value)">
 
-            <!-- Scrubber Controls -->
+            <!-- Controls -->
             <div class="timeline-controls">
                 <button class="btn-icon" onclick="timelineFirst()" title="First Frame">|◀</button>
                 <button class="btn-icon" onclick="timelinePrev()" title="Previous Frame">◀</button>
@@ -623,9 +946,9 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
         </div>
 
         <div id="vizDisplayContainer" class="glass-card" style="display: none;">
-            <div id="vizStepTitle" style="font-weight: 700; color: var(--accent-cyan); font-size: 0.78rem; margin-bottom: 4px;"></div>
+            <div id="vizStepTitle" style="font-weight: 700; color: var(--accent-cyan); font-size: 0.78rem; margin-bottom: 3px;"></div>
             <div id="vizStepExplanation" style="font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 6px;"></div>
-            <div class="chart-box" style="height: 200px;">
+            <div class="chart-box" style="height: 180px;">
                 <canvas id="vizCanvas"></canvas>
             </div>
             <div id="vizCustomDOM"></div>
@@ -633,18 +956,25 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
     </div>
 
     <!-- ───────────────────────────────────────────────────────────── -->
-    <!-- TAB 4: ACADEMIC LAB -->
+    <!-- SECTION 6: ADVANCED ACADEMIC LAB (HIDDEN BY DEFAULT) -->
     <!-- ───────────────────────────────────────────────────────────── -->
     <div id="tab-academic" class="tab-panel ${activeTab === 'academic' ? 'active' : ''}">
         <div class="glass-card" style="border-left: 3px solid var(--accent-purple);">
             <div class="card-header">
-                <span class="card-title" style="color: var(--accent-purple);">Academic Mode (DAA Semester 5)</span>
+                <div>
+                    <span class="card-title" style="color: var(--accent-purple);">Academic Mode (DAA Semester 5)</span>
+                    <div style="margin-top: 2px;">
+                        <span class="badge academic">🎓 Standalone Academic Simulation</span>
+                    </div>
+                </div>
                 <span class="badge academic">Active</span>
             </div>
-            <p style="font-size: 0.7rem; color: var(--text-secondary);">NP-Completeness feasibility estimator & Nature-inspired metaheuristic optimizers.</p>
+            <p style="font-size: 0.7rem; color: var(--text-secondary);">
+                Theoretical models for NP-Completeness feasibility gating, reductions, and Nature-Inspired metaheuristics. Independent of active editor C++ AST.
+            </p>
         </div>
 
-        <!-- NP Advisor -->
+        <!-- NP Feasibility Estimator -->
         <div class="glass-card">
             <span class="card-title" style="display: block; margin-bottom: 4px;">NP Feasibility Estimator</span>
             <div style="display: flex; gap: 4px; margin-bottom: 6px;">
@@ -676,12 +1006,12 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
             </div>
         </div>
 
-        <!-- Nature Lab -->
+        <!-- Nature-Inspired Optimization Lab -->
         <div class="glass-card">
             <span class="card-title" style="display: block; margin-bottom: 6px;">Nature-Inspired Optimization Lab</span>
             <div style="display: flex; gap: 4px;">
                 <button class="btn-action purple" style="flex: 1;" onclick="runNatureOpt('compare_tsp')">ACO vs GA (TSP)</button>
-                <button class="btn-action purple" style="flex: 1;" onclick="runNatureOpt('compare_continuous')">PSO vs GA (Math)</button>
+                <button class="btn-action purple" style="flex: 1;" onclick="runNatureOpt('compare_continuous')">PSO vs GA (Continuous)</button>
             </div>
         </div>
 
@@ -690,7 +1020,7 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
                 <span id="natureResultTitle" class="card-title">Convergence Comparison</span>
                 <span id="natureWinnerBadge" class="badge recommendation"></span>
             </div>
-            <div class="chart-box" style="height: 180px;">
+            <div class="chart-box" style="height: 160px;">
                 <canvas id="natureCanvas"></canvas>
             </div>
             <p id="natureSummaryText" style="font-size: 0.7rem; color: var(--text-primary); margin: 4px 0; background: rgba(0,0,0,0.25); padding: 6px; border-radius: 4px;"></p>
@@ -719,13 +1049,17 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
             vscode.postMessage({ command: 'switchTab', tab: tabId });
         }
 
+        function analyzeAgain() {
+            vscode.postMessage({ command: 'analyzeAgain' });
+        }
+
         function toggleAcademicMode() {
             const cb = document.getElementById('academicModeCheckbox');
             const enabled = cb ? cb.checked : !currentAcademicMode;
             currentAcademicMode = enabled;
             const tab = document.getElementById('academicNavTab');
             if (tab) tab.style.display = enabled ? 'block' : 'none';
-            if (!enabled && activeTabId === 'academic') selectTab('intelligence');
+            if (!enabled && activeTabId === 'academic') selectTab('overview');
             vscode.postMessage({ command: 'setAcademicMode', enabled });
         }
 
@@ -735,7 +1069,7 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
             currentOptimizationBias = bias;
             const lbl = document.getElementById('biasCurrentLabel');
             if (lbl) {
-                lbl.innerText = bias === 'memory' ? 'Memory-First [O(1) Space]' : bias === 'balanced' ? 'Balanced Tradeoff' : 'Speed-First [O(1) Time]';
+                lbl.innerText = bias === 'memory' ? 'Memory-First [O(1) Space]' : bias === 'balanced' ? 'Balanced Strategy' : 'Speed-First [O(1) Time]';
             }
             vscode.postMessage({ command: 'setOptimizationBias', bias });
         }
@@ -750,15 +1084,6 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
 
         function injectTemplate(paradigm) {
             vscode.postMessage({ command: 'injectTemplate', paradigm, bias: currentOptimizationBias });
-        }
-
-        function runEdgeCaseTest(paradigm) {
-            const box = document.getElementById('edgeCaseResultBox');
-            if (box) {
-                box.style.display = 'block';
-                box.innerHTML = '<div style="padding: 10px; color: var(--accent-cyan); text-align: center;">Executing C++ Counterexample Test...</div>';
-            }
-            vscode.postMessage({ command: 'runEdgeCaseTest', paradigm });
         }
 
         function runBeforeAfterBenchmark(varName, fromDS, toDS) {
@@ -858,18 +1183,18 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
 
                 const ctx = canvas.getContext('2d');
                 canvas.width = canvas.parentElement.clientWidth || 300;
-                canvas.height = 60;
+                canvas.height = 50;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#a855f7';
                 ctx.font = '10px monospace';
-                ctx.fillText('Recurrence Transition:', 8, 18);
+                ctx.fillText('Recurrence Transition:', 8, 16);
                 ctx.fillStyle = '#38bdf8';
                 ctx.font = '11px monospace';
-                ctx.fillText(step.formulaApplied || 'dp[i][w] = max(dp[i-1][w], dp[i-1][w-wt] + val)', 8, 38);
+                ctx.fillText(step.formulaApplied || 'dp[i][w] = max(dp[i-1][w], dp[i-1][w-wt] + val)', 8, 34);
             } else if (mode === 'sorting_searching' && step.array) {
                 const ctx = canvas.getContext('2d');
                 canvas.width = canvas.parentElement.clientWidth || 300;
-                canvas.height = 180;
+                canvas.height = 160;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 const arr = step.array;
                 const maxVal = Math.max(...arr, 1);
@@ -894,12 +1219,12 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
                     ctx.fillText(val, x + barWidth / 2, y - 3);
                 }
             } else if (mode === 'backtracking' && step.boardState) {
-                let html = '<div style="display:flex; justify-content:center; margin:6px 0;"><div style="display:grid; grid-template-columns:repeat(' + step.boardState.length + ', 24px); border:1px solid var(--glass-border);">';
+                let html = '<div style="display:flex; justify-content:center; margin:6px 0;"><div style="display:grid; grid-template-columns:repeat(' + step.boardState.length + ', 22px); border:1px solid var(--glass-border);">';
                 for (let r = 0; r < step.boardState.length; r++) {
                     for (let c = 0; c < step.boardState.length; c++) {
                         const hasQueen = step.boardState[r] === c;
                         const bg = hasQueen ? '#a855f7' : (r + c) % 2 === 0 ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.3)';
-                        html += '<div style="width:24px; height:24px; background:' + bg + '; display:flex; align-items:center; justify-content:center; font-size:14px;">' + (hasQueen ? '♛' : '') + '</div>';
+                        html += '<div style="width:22px; height:22px; background:' + bg + '; display:flex; align-items:center; justify-content:center; font-size:12px;">' + (hasQueen ? '♛' : '') + '</div>';
                     }
                 }
                 html += '</div></div>';
@@ -907,11 +1232,11 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
 
                 const ctx = canvas.getContext('2d');
                 canvas.width = canvas.parentElement.clientWidth || 300;
-                canvas.height = 50;
+                canvas.height = 40;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = step.isPruned ? '#ef4444' : step.isSolution ? '#22c55e' : '#38bdf8';
                 ctx.font = '10px sans-serif';
-                ctx.fillText(step.isPruned ? '❌ PRUNED: ' + (step.pruningReason || '') : step.isSolution ? '✓ VALID SOLUTION' : 'Evaluating Choice: ' + step.currentChoice, 8, 25);
+                ctx.fillText(step.isPruned ? '❌ PRUNED: ' + (step.pruningReason || '') : step.isSolution ? '✓ VALID SOLUTION' : 'Evaluating Choice: ' + step.currentChoice, 8, 22);
             }
         }
 
@@ -934,17 +1259,11 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
                 const s = document.getElementById('vizTimelineScrubber');
                 if (s) { s.max = Math.max(0, activeTraceSteps.length - 1); s.value = 0; }
                 renderCurrentFrame();
-            } else if (msg.type === 'edgeCaseResult') {
-                const box = document.getElementById('edgeCaseResultBox');
-                if (box) {
-                    box.style.display = 'block';
-                    box.innerHTML = '<div class="glass-card" style="border-left:3px solid #ef4444; margin:0;"><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><strong style="color:#ef4444; font-size:0.75rem;">🚨 Counterexample Confirmed</strong><span class="badge conf-low">' + msg.payload.fragilityType.toUpperCase() + '</span></div><p style="font-size:0.7rem; color:var(--text-primary); margin-bottom:6px;">' + msg.payload.explanation + '</p><div style="background:rgba(0,0,0,0.3); padding:6px; border-radius:4px; font-family:var(--font-mono); font-size:0.65rem;"><div>Input: <strong style="color:var(--accent-orange);">' + msg.payload.failingInput + '</strong></div><div>Naive Output: <strong style="color:#ef4444;">' + msg.payload.actualNaiveOutput + '</strong></div><div>Optimal DP: <strong style="color:var(--accent-green);">' + msg.payload.expectedOptimalOutput + '</strong></div></div></div>';
-                }
             } else if (msg.type === 'beforeAfterResult') {
                 const box = document.getElementById('beforeAfterResultBox');
                 if (box) {
                     box.style.display = 'block';
-                    box.innerHTML = '<div class="glass-card" style="border-left:3px solid var(--accent-green); margin:0;"><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><strong style="color:var(--accent-green); font-size:0.75rem;">⚡ ' + msg.payload.summaryHeadline + '</strong><span class="badge recommendation">' + msg.payload.overallSpeedupMultiplier + 'x Speedup</span></div><p style="font-size:0.7rem; color:var(--text-secondary); margin-bottom:6px;">' + msg.payload.detailedSummary + '</p><table class="dp-grid"><thead><tr><th>Size N</th><th>Original</th><th>Optimized</th><th>Speedup</th></tr></thead><tbody>' + msg.payload.dataPoints.map(p => '<tr><td><strong>' + p.inputSize + '</strong></td><td style="color:#ef4444;">' + p.beforeTimeMs.toFixed(2) + ' ms</td><td style="color:var(--accent-green); font-weight:bold;">' + p.afterTimeMs.toFixed(2) + ' ms</td><td>' + p.speedupMultiplier + 'x</td></tr>').join('') + '</tbody></table></div>';
+                    box.innerHTML = '<div class="glass-card" style="border-left:3px solid var(--accent-green); margin:0;"><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><strong style="color:var(--accent-green); font-size:0.75rem;">⚡ ' + msg.payload.summaryHeadline + '</strong><span class="badge recommendation">' + msg.payload.overallSpeedupMultiplier + 'x Speedup</span></div><p style="font-size:0.7rem; color:var(--text-secondary); margin-bottom:6px;">' + msg.payload.detailedSummary + '</p><table class="dp-grid"><thead><tr><th>Size N</th><th>Original</th><th>Optimized</th><th>Speedup</th></tr></thead><tbody>' + msg.payload.dataPoints.map(p => '<tr><td><strong>' + p.inputSize + '</strong></td><td style="color:#fca5a5;">' + p.beforeTimeMs.toFixed(2) + ' ms</td><td style="color:var(--accent-green); font-weight:bold;">' + p.afterTimeMs.toFixed(2) + ' ms</td><td>' + p.speedupMultiplier + 'x</td></tr>').join('') + '</tbody></table></div>';
                 }
             } else if (msg.type === 'benchmarkResult') {
                 const c = document.getElementById('benchmarkResultContainer');

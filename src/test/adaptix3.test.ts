@@ -9,7 +9,6 @@
  */
 
 import * as assert from 'assert';
-import { STL_COMPLEXITY_CATALOG } from '../providers/hoverProvider';
 import { TemplateInjector } from '../refactoring/templateInjector';
 import { EdgeCaseRunner } from '../validation/edgeCaseRunner';
 import { BeforeAfterRunner } from '../benchmark/beforeAfterRunner';
@@ -25,18 +24,7 @@ import { TraceGenerators } from '../visualization/traceGenerators';
 export async function runAdaptix3Tests() {
     console.log('--- Testing ADAPTIX 3.0 Architecture & Upgrade Pillars ---');
 
-    // Test 1: STL Big-O Hover Catalog Accuracy & Loop Nesting Logic
-    {
-        assert.ok(STL_COMPLEXITY_CATALOG['vector'], 'vector should exist in STL catalog');
-        assert.ok(STL_COMPLEXITY_CATALOG['unordered_map'], 'unordered_map should exist in STL catalog');
-        assert.ok(STL_COMPLEXITY_CATALOG['erase'], 'erase should exist in STL catalog');
-        assert.ok(STL_COMPLEXITY_CATALOG['erase'].loopWarning, 'erase should contain loop warning');
-        assert.ok(STL_COMPLEXITY_CATALOG['erase'].loopWarning?.includes('O(N²)'), 'erase warning should cite O(N²) quadratic bottleneck');
-
-        assert.strictEqual(STL_COMPLEXITY_CATALOG['sort'].averageTime.includes('IntroSort'), true, 'sort should cite IntroSort');
-        assert.strictEqual(STL_COMPLEXITY_CATALOG['priority_queue'].averageTime.includes('O(log N)'), true, 'priority_queue should cite O(log N)');
-        console.log('✓ STL Big-O Hover: Comprehensive complexity specifications & loop warnings verified');
-    }
+    // Test 1: (Deprecated Hover/CodeLens tests removed per Dashboard-Only mandate)
 
     // Test 2: Space vs. Time Bias Shifting in DecisionEngine
     {
@@ -105,7 +93,7 @@ export async function runAdaptix3Tests() {
         console.log('✓ Two-Sentence Rule: Produces crisp Big-O diagnosis upfront with deep theory segregated');
     }
 
-    // Test 4: AST Parsing & Inline CodeLens Detection
+    // Test 4: AST Parsing & Algorithmic Bottleneck Detection (Dashboard Architecture)
     {
         const sampleCpp = `
         int recursiveFib(int n) {
@@ -133,7 +121,7 @@ export async function runAdaptix3Tests() {
         const vecFunc = parseRes.functions.find(f => f.name === 'processVector');
         assert.ok(vecFunc && vecFunc.maxLoopNestingDepth > 0, 'vecFunc should detect loop nesting');
         assert.ok(vecFunc?.body.includes('.erase('), 'vecFunc should identify erase call inside loop');
-        console.log('✓ Inline CodeLens Pipeline: Correctly extracts functions, exponential recursion, and loop-nested erase bottlenecks');
+        console.log('✓ AST Parser Pipeline: Correctly extracts functions, exponential recursion, and loop-nested erase bottlenecks');
     }
 
     // Test 5: Context-Aware Template Injection

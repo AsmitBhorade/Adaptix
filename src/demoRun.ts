@@ -1,5 +1,5 @@
 /**
- * ADAPTIX 2.0 — Complete Engine Live Execution Runner
+ * ADAPTIX 3.0 — Complete Engine Live Execution Runner
  * 
  * Ingests 'examples/all_features_demo.cpp' and runs all 6 core subsystems:
  * 1. Unified Intelligence Pipeline
@@ -23,19 +23,28 @@ import { TraceGenerators } from './visualization/traceGenerators';
 
 async function runDemo() {
     console.log('╔═══════════════════════════════════════════════════════════════════╗');
-    console.log('║               ADAPTIX 2.0 LIVE EXECUTION DEMO                    ║');
+    console.log('║               ADAPTIX 3.0 LIVE EXECUTION DEMO                    ║');
     console.log('║       Intelligent Algorithm & Data Structure Optimization Engine ║');
     console.log('╚═══════════════════════════════════════════════════════════════════╝\n');
 
-    const demoFilePath = path.join(__dirname, '../../examples/all_features_demo.cpp');
     let code = '';
-    try {
-        code = fs.readFileSync(demoFilePath, 'utf-8');
-    } catch {
-        code = fs.readFileSync(path.join(__dirname, '../examples/all_features_demo.cpp'), 'utf-8');
+    let loadedFile = 'demo_adaptix.cpp';
+    const candidatePaths = [
+        path.join(__dirname, '../../demo_adaptix.cpp'),
+        path.join(__dirname, '../demo_adaptix.cpp'),
+        path.join(__dirname, '../../examples/demo_all_features.cpp'),
+        path.join(__dirname, '../examples/demo_all_features.cpp')
+    ];
+
+    for (const p of candidatePaths) {
+        if (fs.existsSync(p)) {
+            code = fs.readFileSync(p, 'utf-8');
+            loadedFile = path.basename(p);
+            break;
+        }
     }
 
-    console.log(`[Source Ingestion] Loaded 'examples/all_features_demo.cpp' (${code.length} bytes, ${code.split('\n').length} lines)\n`);
+    console.log(`[Source Ingestion] Loaded '${loadedFile}' (${code.length} bytes, ${code.split('\n').length} lines)\n`);
 
     // ─────────────────────────────────────────────────────────────
     // 1. UNIFIED PIPELINE ANALYSIS
@@ -164,7 +173,7 @@ async function runDemo() {
     console.log(`• Generated ${nQueensTraces.length} Backtracking search tree frames for 4-Queens (with conflict pruning & solutions)`);
 
     console.log('\n╔═══════════════════════════════════════════════════════════════════╗');
-    console.log('║       ALL ADAPTIX 2.0 SUBSYSTEMS OPERATIONAL & VERIFIED           ║');
+    console.log('║       ALL ADAPTIX 3.0 SUBSYSTEMS OPERATIONAL & VERIFIED           ║');
     console.log('╚═══════════════════════════════════════════════════════════════════╝\n');
 }
 

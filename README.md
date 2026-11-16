@@ -299,5 +299,5 @@ Adaptix-DSA-master/
 
 ---
 
-## 7. License
-MIT License. Created by Adhiraj Patil. Upgraded to ADAPTIX 3.0.
+## 7. License & Ownership
+MIT License. Created & Owned by Asmit Bhorade (https://github.com/AsmitBhorade/Adaptix). Upgraded to ADAPTIX 3.0.

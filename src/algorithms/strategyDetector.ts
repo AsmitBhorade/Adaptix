@@ -192,6 +192,39 @@ export class StrategyDetector {
             });
         }
 
+        // 5. STRING MATCHING / KMP DETECTION
+        const lowerCode = code.toLowerCase();
+        const hasSubstringSearch = lowerCode.includes('substring') || lowerCode.includes('kmp') ||
+            (lowerCode.includes('pattern') && (lowerCode.includes('text') || lowerCode.includes('string')) && !hasRecursion);
+        if (hasSubstringSearch) {
+            results.push({
+                detectedParadigm: 'dynamic_programming',
+                confidence: 0.92,
+                confidenceLabel: 'Strong',
+                primaryReason: 'Detected nested substring search with potential O(N * M) worst-case comparison bottleneck.',
+                supportingObservations: [
+                    'Iterates over text with inner loop matching pattern characters.',
+                    'Mismatch triggers backtrack of text index or restart of inner scan.',
+                    'Knuth-Morris-Pratt (KMP) or Rabin-Karp can optimize this to linear O(N + M) time.'
+                ],
+                recurrenceRelation: 'pi[q] = max{k : P_k is a proper suffix of P_q} ==> LPS Preprocessing: O(M), Matching: O(N)',
+                theoreticalComplexity: {
+                    current: { time: 'O(N * M)', space: 'O(1)' },
+                    proposed: { time: 'O(N + M)', space: 'O(M) for LPS table' }
+                },
+                tradeoffs: [
+                    'Eliminates redundant comparisons by computing failure function table.',
+                    'Guarantees linear O(N + M) time regardless of repetitive character patterns.',
+                    'Requires auxiliary O(M) memory for prefix table.'
+                ],
+                whyApplicable: 'Precomputed prefix-suffix information avoids rolling the text index backward upon character mismatch.',
+                whyAlternativesFail: 'Naive brute-force incurs quadratic worst-case degradation on highly repetitive patterns (e.g., AAAAAB in AAAAAAAAAAA).',
+                matchingCanonicalProblem: CANONICAL_PROBLEMS['kmp_string_matching'],
+                suggestedRefactoringCpp: CANONICAL_PROBLEMS['kmp_string_matching'].optimalCodeCpp,
+                requiresSemanticTransformation: false
+            });
+        }
+
         // If no specific paradigm matched, return a general heuristic evaluation
         if (results.length === 0) {
             results.push({
@@ -313,6 +346,9 @@ export class StrategyDetector {
         }
         if (lower.includes('lcs') || (lower.includes('subsequence') && lower.includes('string'))) {
             return CANONICAL_PROBLEMS['longest_common_subsequence'];
+        }
+        if (lower.includes('kmp') || lower.includes('substring') || (lower.includes('pattern') && (lower.includes('search') || lower.includes('match')))) {
+            return CANONICAL_PROBLEMS['kmp_string_matching'];
         }
         if (lower.includes('activity') || lower.includes('schedule') || lower.includes('interval')) {
             return CANONICAL_PROBLEMS['activity_selection'];
