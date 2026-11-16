@@ -1,5 +1,5 @@
 /**
- * Master Unit & Integration Tests for ADAPTIX 3.0
+ * Master Unit & Integration Tests for ADAPTIX
  * 
  * Verifies all 4 Pillars:
  * 1. Consolidated Dashboard, Academic Mode Toggle & Two-Sentence Rule formatting.
@@ -21,8 +21,8 @@ import { CppAstParser } from '../analysis/astParser';
 import { StrategyDetector } from '../algorithms/strategyDetector';
 import { TraceGenerators } from '../visualization/traceGenerators';
 
-export async function runAdaptix3Tests() {
-    console.log('--- Testing ADAPTIX 3.0 Architecture & Upgrade Pillars ---');
+export async function runAdaptixTests() {
+    console.log('--- Testing ADAPTIX Architecture & Upgrade Pillars ---');
 
     // Test 1: (Deprecated Hover/CodeLens tests removed per Dashboard-Only mandate)
 
@@ -201,5 +201,5 @@ export async function runAdaptix3Tests() {
         console.log(`✓ Closed-Loop Benchmark: ${benchResult.summaryHeadline} (Verified: ${benchResult.correctnessVerified})`);
     }
 
-    console.log('\n>>> [PASS] ADAPTIX 3.0 Master Architecture Test Suite\n');
+    console.log('\n>>> [PASS] ADAPTIX Master Architecture Test Suite\n');
 }

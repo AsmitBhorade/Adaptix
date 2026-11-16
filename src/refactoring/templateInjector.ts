@@ -41,7 +41,7 @@ export class TemplateInjector {
             case 'dynamic_programming_tab':
                 if (bias === 'memory') {
                     // Memory-First: Rolling variables O(1) space
-                    return `// ADAPTIX 3.0: Memory-Optimized DP Tabulation (Rolling Variables - O(1) Auxiliary Space)
+                    return `// ADAPTIX: Memory-Optimized DP Tabulation (Rolling Variables - O(1) Auxiliary Space)
 ${returnType} ${funcName}_optimized(${rawParams}) {
     if (${primaryParam} <= 1) return ${primaryParam};
     
@@ -59,7 +59,7 @@ ${returnType} ${funcName}_optimized(${rawParams}) {
 }`;
                 } else {
                     // Speed-First: Flat vector DP table
-                    return `// ADAPTIX 3.0: Bottom-Up DP Tabulation (Iterative O(N) Time - Cache Friendly)
+                    return `// ADAPTIX: Bottom-Up DP Tabulation (Iterative O(N) Time - Cache Friendly)
 #include <vector>
 
 ${returnType} ${funcName}_optimized(${rawParams}) {
@@ -78,7 +78,7 @@ ${returnType} ${funcName}_optimized(${rawParams}) {
                 }
 
             case 'dynamic_programming_memo':
-                return `// ADAPTIX 3.0: Top-Down DP with Memoization (O(N) Time, O(N) Space)
+                return `// ADAPTIX: Top-Down DP with Memoization (O(N) Time, O(N) Space)
 #include <unordered_map>
 
 ${returnType} ${funcName}_memoHelper(int state, std::unordered_map<int, ${returnType}>& memo) {
@@ -99,7 +99,7 @@ ${returnType} ${funcName}_optimized(${rawParams}) {
 }`;
 
             case 'divide_and_conquer':
-                return `// ADAPTIX 3.0: Divide and Conquer Template (Master Theorem Theta(N log N))
+                return `// ADAPTIX: Divide and Conquer Template (Master Theorem Theta(N log N))
 #include <vector>
 
 void ${funcName}_combine(std::vector<int>& arr, int left, int mid, int right) {
@@ -128,7 +128,7 @@ void ${funcName}_divideAndConquer(std::vector<int>& arr, int left, int right) {
 }`;
 
             case 'two_pointers':
-                return `// ADAPTIX 3.0: In-Place Two Pointers Pattern (O(N) Time, O(1) Auxiliary Memory)
+                return `// ADAPTIX: In-Place Two Pointers Pattern (O(N) Time, O(1) Auxiliary Memory)
 #include <vector>
 
 ${returnType} ${funcName}_twoPointers(std::vector<int>& arr, int target) {
@@ -149,7 +149,7 @@ ${returnType} ${funcName}_twoPointers(std::vector<int>& arr, int target) {
 }`;
 
             case 'sliding_window':
-                return `// ADAPTIX 3.0: Monotonic Sliding Window (Amortized O(N) Time, O(1) Extra Space)
+                return `// ADAPTIX: Monotonic Sliding Window (Amortized O(N) Time, O(1) Extra Space)
 #include <vector>
 #include <algorithm>
 
@@ -169,7 +169,7 @@ ${returnType} ${funcName}_slidingWindow(const std::vector<int>& arr, int k) {
 }`;
 
             case 'binary_search_answer':
-                return `// ADAPTIX 3.0: Binary Search on Monotonic Answer Space (O(N log(Range)))
+                return `// ADAPTIX: Binary Search on Monotonic Answer Space (O(N log(Range)))
 #include <vector>
 
 bool ${funcName}_isValid(long long mid, const std::vector<int>& arr, int k) {
@@ -206,7 +206,7 @@ long long ${funcName}_binarySearchAnswer(const std::vector<int>& arr, int k) {
 
             case 'backtracking_pruning':
             default:
-                return `// ADAPTIX 3.0: Backtracking with Constraint Pruning & State Rollback
+                return `// ADAPTIX: Backtracking with Constraint Pruning & State Rollback
 #include <vector>
 
 void ${funcName}_backtrack(int depth, std::vector<int>& state, std::vector<std::vector<int>>& solutions) {
@@ -256,7 +256,7 @@ void ${funcName}_backtrack(int depth, std::vector<int>& state, std::vector<std::
 
         const success = await vscode.workspace.applyEdit(edit);
         if (success) {
-            vscode.window.showInformationMessage('Adaptix 3.0: Algorithmic template injected successfully!');
+            vscode.window.showInformationMessage('ADAPTIX: Algorithmic template injected successfully!');
         }
         return success;
     }

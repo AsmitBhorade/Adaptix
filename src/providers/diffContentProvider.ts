@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 
 /**
- * Adaptix 3.0 Native Semantic "Smart" Diff Content Provider
+ * Adaptix Native Semantic "Smart" Diff Content Provider
  * 
  * Provides a virtual read-only TextDocumentContentProvider (adaptix-diff://)
  * allowing developers to inspect side-by-side semantic refactorings natively
@@ -74,7 +74,7 @@ export class AdaptixDiffContentProvider implements vscode.TextDocumentContentPro
         const applied = await vscode.workspace.applyEdit(edit);
 
         if (applied) {
-            vscode.window.showInformationMessage('Adaptix 3.0: Refactoring applied successfully!');
+            vscode.window.showInformationMessage('Adaptix: Refactoring applied successfully!');
             this._pendingRefactors.delete(virtualUri.toString());
             this._contentStore.delete(virtualUri.toString());
         } else {

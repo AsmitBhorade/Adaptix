@@ -1,5 +1,5 @@
 /**
- * Unit Tests for ADAPTIX 3.0 Preserved Data Structure Intelligence
+ * Unit Tests for ADAPTIX Preserved Data Structure Intelligence
  */
 
 import * as assert from 'assert';

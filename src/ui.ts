@@ -619,7 +619,7 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
         <div class="brand-title">
             <div class="brand-logo-text">
                 <span>ADAPTIX</span>
-                <span class="brand-badge">v3.1.0</span>
+                <span class="brand-badge">v3.1.3</span>
             </div>
             <div class="brand-subtext">Asmit Bhorade &bull; Algorithm Intelligence Engine</div>
         </div>
@@ -1398,7 +1398,7 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
                 const box = document.getElementById('beforeAfterResultBox');
                 if (box) {
                     box.style.display = 'block';
-                    box.innerHTML = '<div class="glass-card" style="border-left:3px solid var(--accent-green); margin:0;"><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><strong style="color:var(--accent-green); font-size:0.75rem;">⚡ ' + msg.payload.summaryHeadline + '</strong><span class="badge recommendation">' + msg.payload.overallSpeedupMultiplier + 'x Speedup</span></div><p style="font-size:0.7rem; color:var(--text-secondary); margin-bottom:6px;">' + msg.payload.detailedSummary + '</p><table class="dp-grid"><thead><tr><th>Size N</th><th>Original</th><th>Optimized</th><th>Speedup</th></tr></thead><tbody>' + msg.payload.dataPoints.map(p => '<tr><td><strong>' + p.inputSize + '</strong></td><td style="color:#fca5a5;">' + p.beforeTimeMs.toFixed(2) + ' ms</td><td style="color:var(--accent-green); font-weight:bold;">' + p.afterTimeMs.toFixed(2) + ' ms</td><td>' + p.speedupMultiplier + 'x</td></tr>').join('') + '</tbody></table></div>';
+                    box.innerHTML = '<div class="glass-card" style="border-left:3px solid var(--accent-green); margin:0;"><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><strong style="color:var(--accent-green); font-size:0.75rem;">⚡ ' + msg.payload.summaryHeadline + '</strong><span class="badge recommendation">' + msg.payload.overallSpeedupMultiplier + 'x Speedup</span></div><p style="font-size:0.7rem; color:var(--text-secondary); margin-bottom:6px;">' + msg.payload.detailedSummary + '</p><table class="dp-grid"><thead><tr><th>Size N</th><th>Original</th><th>Optimized</th><th>Speedup</th></tr></thead><tbody>' + msg.payload.dataPoints.map(p => '<tr><td><strong>' + p.inputSize + '</strong></td><td style="color:#fca5a5;">' + (p.beforeTimeMs < 0.01 && p.beforeTimeMs > 0 ? p.beforeTimeMs.toFixed(3) : p.beforeTimeMs.toFixed(2)) + ' ms</td><td style="color:var(--accent-green); font-weight:bold;">' + (p.afterTimeMs < 0.01 && p.afterTimeMs > 0 ? p.afterTimeMs.toFixed(3) : p.afterTimeMs.toFixed(2)) + ' ms</td><td>' + p.speedupMultiplier + 'x</td></tr>').join('') + '</tbody></table></div>';
                 }
             } else if (msg.type === 'benchmarkResult') {
                 const c = document.getElementById('benchmarkResultContainer');

@@ -1,5 +1,5 @@
 /**
- * Master Test Suite Runner for ADAPTIX 3.0
+ * Master Test Suite Runner for ADAPTIX
  */
 
 import { runDataStructureTests } from './dataStructures.test';
@@ -9,11 +9,11 @@ import { runComplexityBenchmarkTests } from './complexityBenchmark.test';
 import { runNPAdvisorTests } from './npAdvisor.test';
 import { runVisualizerTests } from './visualizer.test';
 import { runPipelineTests } from './pipeline.test';
-import { runAdaptix3Tests } from './adaptix3.test';
+import { runAdaptixTests } from './adaptix.test';
 
 async function main() {
     console.log('===============================================================');
-    console.log('  ADAPTIX 3.0 MASTER TEST SUITE EXECUTION');
+    console.log('  ADAPTIX MASTER TEST SUITE EXECUTION');
     console.log('  Frictionless Algorithm & Data Structure Optimization Engine');
     console.log('===============================================================\n');
 
@@ -28,7 +28,7 @@ async function main() {
         { name: 'NP-Completeness and Approximation Advisor (Module 4)', runner: runNPAdvisorTests },
         { name: 'Nature-Inspired Optimization Lab (Module 5)', runner: runNatureInspiredTests },
         { name: 'Unified Intelligence Pipeline (Module 6)', runner: runPipelineTests },
-        { name: 'ADAPTIX 3.0 Architecture & Upgrade Pillars (Module 7)', runner: runAdaptix3Tests }
+        { name: 'ADAPTIX Architecture & Upgrade Pillars (Module 7)', runner: runAdaptixTests }
     ];
 
     for (const suite of suites) {
@@ -47,7 +47,7 @@ async function main() {
     console.log('===============================================================');
     if (totalFailed === 0) {
         console.log(`  ALL TEST SUITES PASSED! (${suites.length}/${suites.length} suites passed in ${elapsed}ms)`);
-        console.log('  Semester 4 functionality preserved. Semester 5 DAA verified. ADAPTIX 3.0 Upgrades Operational.');
+        console.log('  Semester 4 functionality preserved. Semester 5 DAA verified. ADAPTIX Upgrades Operational.');
     } else {
         console.error(`  TEST FAILURES: ${totalFailed} suite(s) failed.`);
         process.exit(1);

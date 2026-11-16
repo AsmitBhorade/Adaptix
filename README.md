@@ -12,7 +12,7 @@
 
 **Adaptix** is an enterprise-grade, developer-first algorithmic engineering and optimization engine built natively as a Visual Studio Code extension for C++ engineers, performance specialists, computer science students, and researchers.
 
-Where ADAPTIX 2.0 consolidated algorithmic complexity theory and Semester 5 DAA concepts, **Adaptix** streamlines the user interface, elevates editor-native integration, closes the code-refactoring loop, and enforces progressive disclosure. The result is a frictionless, high-precision production developer tool that retains the full mathematical power of Semester 4 DSA and Semester 5 DAA on demand.
+Where earlier versions consolidated algorithmic complexity theory and Semester 5 DAA concepts, **Adaptix** streamlines the user interface, elevates editor-native integration, closes the code-refactoring loop, and enforces progressive disclosure. The result is a frictionless, high-precision production developer tool that retains the full mathematical power of Semester 4 DSA and Semester 5 DAA on demand.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
@@ -39,7 +39,7 @@ Where ADAPTIX 2.0 consolidated algorithmic complexity theory and Semester 5 DAA 
 ## 2. Core Upgrades in Adaptix
 
 ### Pillar 1 — Decluttering & Progressive Disclosure ("Trim the Fat")
-* **Consolidated 3-Pillar Dashboard:** The 9 fragmented dashboard sections from ADAPTIX 2.0 are now organized into 3 primary tabs:
+* **Consolidated 3-Pillar Dashboard:** The 9 fragmented dashboard sections from legacy versions are now organized into 3 primary tabs:
   1. **Code Intelligence:** Unified workspace for Data Structure recommendations, Algorithm Strategy detection, Automated Edge-Case tests, Template Injection, and Semantic Smart Diffs.
   2. **Performance Lab:** Complexity analysis, Space vs. Time slider controls, real C++ execution benchmarking, Before/After optimization speedups, and a collapsible History & Reports drawer.
   3. **Visual Debugger:** Interactive step-by-step algorithm visualizers with the new Timeline Scrubber.
@@ -227,11 +227,11 @@ npm test
 
 ```
 Adaptix-DSA-master/
-├── package.json                          # Extension manifest (v3.0.0, commands, configuration)
+├── package.json                          # Extension manifest (commands, configuration)
 ├── README.md                             # Comprehensive Adaptix technical documentation
 ├── tsconfig.json                         # TypeScript configuration (ES2022, DOM, Node16)
 ├── src/
-│   ├── extension.ts                      # Main entry point registering all 3.0 providers & commands
+│   ├── extension.ts                      # Main entry point registering all providers & commands
 │   ├── ui.ts                             # Consolidated 3-Pillar Webview dashboard provider
 │   ├── analyzer.ts                       # Real-time C++ keystroke parser & operation monitor
 │   ├── decision.ts                       # Min-Heap cost engine with Space vs. Time optimization bias
@@ -286,7 +286,7 @@ Adaptix-DSA-master/
 │   │   └── unifiedPipeline.ts            # Unified cross-cutting intelligence coordinator
 │   └── test/
 │       ├── runAllTests.ts                # Master test runner (all 8 suites)
-│       ├── adaptix3.test.ts              # Comprehensive Adaptix upgrade tests
+│       ├── adaptix.test.ts               # Comprehensive Adaptix upgrade tests
 │       ├── algorithms.test.ts            # Algorithm strategy detection tests
 │       ├── complexityBenchmark.test.ts   # Benchmark runner tests
 │       ├── dataStructures.test.ts        # Data structure intelligence tests

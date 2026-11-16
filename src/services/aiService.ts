@@ -1,5 +1,5 @@
 /**
- * Adaptix 3.0 AI Service for Semantic Refactoring
+ * Adaptix AI Service for Semantic Refactoring
  * 
  * Interfaces with LLM / local Qwen Coder to generate semantic code transformations.
  * Enforces:

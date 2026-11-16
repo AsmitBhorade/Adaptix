@@ -108,7 +108,7 @@ export interface DecisionResult {
     insight: string | null;
     alternativeDetails?: { name: string; traits: string[] };
 
-    // ADAPTIX 3.0 Two-Sentence Rule & Bias
+    // ADAPTIX Two-Sentence Rule & Bias
     twoSentenceSummary?: string;
     deepExplanation?: string;
     optimizationBias?: 'speed' | 'balanced' | 'memory';

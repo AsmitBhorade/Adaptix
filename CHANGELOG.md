@@ -2,6 +2,22 @@
 
 All notable changes to the "adaptix" extension will be documented in this file.
 
+## [3.1.3] - 2026-11-16
+
+### Bug Fix: Webview Carousel State Sync on Smart Diff
+- **Retain Webview Context**: Set `retainContextWhenHidden: true` in `registerWebviewViewProvider` to prevent reloading and UI resetting when switching tabs to diff editor.
+- **Diff Scheme Exclusion**: Prevented `performSafeAnalysis` from running on virtual `adaptix-diff://` documents during side-by-side inspection.
+- **Carousel Freeze on Diff**: Ensured `openSmartDiff` click handler purely requests diff preview without mutating local carousel item state or advancing navigation.
+
+## [3.1.2] - 2026-11-16
+
+### Refinements & Global Polish
+- **Decoupled Smart Diff**: Previewing Smart Diff opens side-by-side comparison in editor without popup modals; application is triggered exclusively via the dashboard.
+- **DCE Elimination in Benchmark Harness**: Volatile accumulator sinks and isolated iteration buffers prevent compiler dead code elimination under `-O2`.
+- **Dynamic Algorithm Rewriting Engine**: Generalized automated refactoring for algorithmic bottlenecks.
+- **Strict Brand Unification**: Consolidated branding workspace-wide to Adaptix.
+- **Workspace Cleanup**: Pruned legacy packages and temporary artifacts.
+
 ## [3.0.0] - 2026-11-14
 
 ### Major Architecture Upgrade — Adaptix

@@ -1,7 +1,7 @@
 {
   "name": "adaptix",
   "displayName": "Adaptix",
-  "description": "ADAPTIX 3.0 — Frictionless Developer-First Algorithm & Data Structure Optimization Engine",
+  "description": "ADAPTIX — Frictionless Developer-First Algorithm & Data Structure Optimization Engine",
   "publisher": "asmitbhorade",
   "author": "Asmit Bhorade",
   "repository": {
@@ -9,7 +9,7 @@
     "url": "https://github.com/AsmitBhorade/Adaptix"
   },
   "icon": "images/logo.png",
-  "version": "3.1.0",
+  "version": "3.1.3",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -27,7 +27,7 @@
   "main": "./out/extension.js",
   "contributes": {
     "configuration": {
-      "title": "Adaptix 3.0",
+      "title": "Adaptix",
       "properties": {
         "adaptix.academicMode": {
           "type": "boolean",
@@ -60,7 +60,7 @@
       "activitybar": [
         {
           "id": "adaptix",
-          "title": "Adaptix 3.0",
+          "title": "Adaptix",
           "icon": "$(pulse)"
         }
       ]

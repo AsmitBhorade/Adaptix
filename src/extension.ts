@@ -34,7 +34,11 @@ export function activate(context: vscode.ExtensionContext) {
     // Dashboard Webview Provider
     const provider = new AdaptixViewProvider(context.extensionUri);
     context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider(AdaptixViewProvider.viewType, provider)
+        vscode.window.registerWebviewViewProvider(AdaptixViewProvider.viewType, provider, {
+            webviewOptions: {
+                retainContextWhenHidden: true
+            }
+        })
     );
 
     // Diff Content Provider for Native Semantic Smart Diff (adaptix-diff://)
@@ -58,6 +62,9 @@ export function activate(context: vscode.ExtensionContext) {
      */
     const performSafeAnalysis = (document: vscode.TextDocument) => {
         if (document.languageId !== 'cpp' && document.languageId !== 'c') {
+            return;
+        }
+        if (document.uri.scheme !== 'file') {
             return;
         }
 
@@ -110,7 +117,7 @@ export function activate(context: vscode.ExtensionContext) {
                 clearTimeout(debounceTimer);
                 debounceTimer = undefined;
             }
-            if (editor && (editor.document.languageId === 'cpp' || editor.document.languageId === 'c')) {
+            if (editor && editor.document.uri.scheme === 'file' && (editor.document.languageId === 'cpp' || editor.document.languageId === 'c')) {
                 performSafeAnalysis(editor.document);
             }
         })
@@ -119,7 +126,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Document Open: Safe automatic analysis
     context.subscriptions.push(
         vscode.workspace.onDidOpenTextDocument(document => {
-            if (document.languageId === 'cpp' || document.languageId === 'c') {
+            if (document.uri.scheme === 'file' && (document.languageId === 'cpp' || document.languageId === 'c')) {
                 performSafeAnalysis(document);
             }
         })
@@ -128,6 +135,9 @@ export function activate(context: vscode.ExtensionContext) {
     // Keystroke Debouncing (500ms): Do not analyze on every keystroke
     context.subscriptions.push(
         vscode.workspace.onDidChangeTextDocument(event => {
+            if (event.document.uri.scheme !== 'file') {
+                return;
+            }
             if (event.document.languageId !== 'cpp' && event.document.languageId !== 'c') {
                 return;
             }
@@ -290,22 +300,11 @@ export function activate(context: vscode.ExtensionContext) {
                 const afterLines = lines.slice(funcNode.endLine);
                 const proposedCode = [...beforeLines, rewriteResult.optimizedCode, ...afterLines].join('\n');
 
-                const virtualUri = await diffProvider.openDiff(
+                await diffProvider.openDiff(
                     editor.document.uri,
                     proposedCode,
                     `ADAPTIX Algorithm Smart Diff: ${targetVar} (${rewriteResult.paradigm})`
                 );
-
-                const choice = await vscode.window.showInformationMessage(
-                    `Algorithm Smart Diff active for ${targetVar}. Accept changes?`,
-                    'Accept Refactor',
-                    'Discard'
-                );
-
-                if (choice === 'Accept Refactor') {
-                    await diffProvider.acceptRefactor(virtualUri);
-                    performSafeAnalysis(editor.document);
-                }
                 return;
             }
 
@@ -327,22 +326,11 @@ export function activate(context: vscode.ExtensionContext) {
                 });
 
                 const proposedCode = aiResult ? aiResult.new_code : docText;
-                const virtualUri = await diffProvider.openDiff(
+                await diffProvider.openDiff(
                     editor.document.uri,
                     proposedCode,
                     `ADAPTIX Smart Diff: ${targetVar} → ${targetDS.replace('std::', '')}`
                 );
-
-                const choice = await vscode.window.showInformationMessage(
-                    `Smart Diff active for ${targetVar}. Accept changes?`,
-                    'Accept Refactor',
-                    'Discard'
-                );
-
-                if (choice === 'Accept Refactor') {
-                    await diffProvider.acceptRefactor(virtualUri);
-                    performSafeAnalysis(editor.document);
-                }
             });
         })
     );
