@@ -1,5 +1,5 @@
 /**
- * ADAPTIX 3.0 — Complete Engine Live Execution Runner
+ * Adaptix — Complete Engine Live Execution Runner
  * 
  * Ingests 'examples/all_features_demo.cpp' and runs all 6 core subsystems:
  * 1. Unified Intelligence Pipeline
@@ -23,7 +23,7 @@ import { TraceGenerators } from './visualization/traceGenerators';
 
 async function runDemo() {
     console.log('╔═══════════════════════════════════════════════════════════════════╗');
-    console.log('║               ADAPTIX 3.0 LIVE EXECUTION DEMO                    ║');
+    console.log('║               ADAPTIX LIVE EXECUTION DEMO                         ║');
     console.log('║       Intelligent Algorithm & Data Structure Optimization Engine ║');
     console.log('╚═══════════════════════════════════════════════════════════════════╝\n');
 
@@ -173,7 +173,7 @@ async function runDemo() {
     console.log(`• Generated ${nQueensTraces.length} Backtracking search tree frames for 4-Queens (with conflict pruning & solutions)`);
 
     console.log('\n╔═══════════════════════════════════════════════════════════════════╗');
-    console.log('║       ALL ADAPTIX 3.0 SUBSYSTEMS OPERATIONAL & VERIFIED           ║');
+    console.log('║       ALL ADAPTIX SUBSYSTEMS OPERATIONAL & VERIFIED               ║');
     console.log('╚═══════════════════════════════════════════════════════════════════╝\n');
 }
 

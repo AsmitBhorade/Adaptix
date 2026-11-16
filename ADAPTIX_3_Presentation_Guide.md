@@ -1,6 +1,6 @@
-# ADAPTIX 3.0 — Faculty Presentation & Live Walkthrough Guide
+# Adaptix — Faculty Presentation & Live Walkthrough Guide
 
-**Project**: ADAPTIX 3.0 — Frictionless Developer-First Algorithm & Data Structure Optimization Engine  
+**Project**: Adaptix — Frictionless Developer-First Algorithm & Data Structure Optimization Engine  
 **Author & Project Owner**: Asmit Bhorade  
 **Target File**: [demo_adaptix.cpp](file:///c:/Users/asmit/OneDrive/Desktop/Adaptix-DSA-master/demo_adaptix.cpp)  
 **Academic Alignment**: Semester 4 Data Structures & Semester 5 Design and Analysis of Algorithms (DAA)
@@ -9,10 +9,10 @@
 
 ## Presentation Overview & Demo Architecture
 
-This guide provides an exact, step-by-step walkthrough script for demonstrating ADAPTIX 3.0 to university faculty and evaluation committees. Every demonstration step maps directly from a specific C++ function in [demo_adaptix.cpp](file:///c:/Users/asmit/OneDrive/Desktop/Adaptix-DSA-master/demo_adaptix.cpp) to dedicated tabs within the **ADAPTIX 3.0 Unified Dashboard**.
+This guide provides an exact, step-by-step walkthrough script for demonstrating Adaptix to university faculty and evaluation committees. Every demonstration step maps directly from a specific C++ function in [demo_adaptix.cpp](file:///c:/Users/asmit/OneDrive/Desktop/Adaptix-DSA-master/demo_adaptix.cpp) to dedicated tabs within the **Adaptix Unified Dashboard**.
 
 ```
-demo_adaptix.cpp Functions ───► ADAPTIX 3.0 Unified Dashboard
+demo_adaptix.cpp Functions ───► Adaptix Unified Dashboard
 ├── processPendingQueue()   ───► Code Intelligence & Optimization Workflow (Vector ──► List/Deque)
 ├── trackUserSessions()     ───► Code Intelligence & Optimization Workflow (Map ──► Unordered Map)
 ├── fibonacci()             ───► Learn & Explore (Recursion Tree Visualizer) & DP Optimization
@@ -34,8 +34,8 @@ demo_adaptix.cpp Functions ───► ADAPTIX 3.0 Unified Dashboard
 4. Confirm **Academic Mode** toggle is initially unchecked (default clean production mode).
 
 ### Spoken Script:
-> *"Respected faculty members, welcome to the demonstration of ADAPTIX 3.0. In production C++ software engineering, developers frequently choose suboptimal data structures or fall into algorithmic anti-patterns without measuring their true computational cost.*  
-> *ADAPTIX 3.0 solves this by providing a unified, real-time intelligence engine directly inside VS Code. Rather than scattering noisy diagnostics or obsolete hover popups across your editor, all intelligence is consolidated into our 5-section high-performance dashboard.*  
+> *"Respected faculty members, welcome to the demonstration of Adaptix. In production C++ software engineering, developers frequently choose suboptimal data structures or fall into algorithmic anti-patterns without measuring their true computational cost.*  
+> *Adaptix solves this by providing a unified, real-time intelligence engine directly inside VS Code. Rather than scattering noisy diagnostics or obsolete hover popups across your editor, all intelligence is consolidated into our 5-section high-performance dashboard.*  
 > *We have prepared `demo_adaptix.cpp`, a clean C++17 master test harness that triggers every core engine subsystem."*
 
 ---
@@ -197,7 +197,7 @@ demo_adaptix.cpp Functions ───► ADAPTIX 3.0 Unified Dashboard
 ## Summary & Closing Remarks
 
 ### Presenter Wrap-Up:
-> *"In summary, ADAPTIX 3.0 bridges the gap between academic algorithmic theory and real-world developer productivity:*  
+> *"In summary, Adaptix bridges the gap between academic algorithmic theory and real-world developer productivity:*  
 > *1. **Code Intelligence** eliminates container bottlenecks with precision Big-O heuristics.*  
 > *2. **Optimization Workflow** provides safe, side-by-side refactoring with zero compiler breaks.*  
 > *3. **Visual Algorithm Debugger** turns abstract recurrences, DP matrices, and KMP failure tables into intuitive step-by-step visualizations.*  

@@ -106,7 +106,7 @@ int planCampusDeliveryRouteTSP(const std::vector<std::vector<int>>& distanceMatr
 }
 
 int main() {
-    std::cout << "Starting ADAPTIX 3.0 Master Verification Harness..." << std::endl;
+    std::cout << "Starting Adaptix Master Verification Harness..." << std::endl;
 
     // 1. Data Structure Trigger 1: Vector front-insertion
     processPendingQueue(100);
@@ -148,6 +148,6 @@ int main() {
     }
     planCampusDeliveryRouteTSP(tspMatrix);
 
-    std::cout << "ADAPTIX 3.0 Master Verification Harness Completed." << std::endl;
+    std::cout << "Adaptix Master Verification Harness Completed." << std::endl;
     return 0;
 }

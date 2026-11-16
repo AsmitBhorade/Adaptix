@@ -1,4 +1,4 @@
-# ADAPTIX 3.0 — Frictionless Developer-First Algorithm & Data Structure Optimization Engine
+# Adaptix — Frictionless Developer-First Algorithm & Data Structure Optimization Engine
 
 [![TypeScript](https://img.shields.io/badge/Language-TypeScript_5.9-blue.svg)](https://www.typescriptlang.org/)
 [![VS Code Extension](https://img.shields.io/badge/Platform-VS_Code_Extension_API-purple.svg)](https://code.visualstudio.com/api)
@@ -10,13 +10,13 @@
 
 ## 1. Executive Summary & Objective
 
-**ADAPTIX 3.0** is an enterprise-grade, developer-first algorithmic engineering and optimization engine built natively as a Visual Studio Code extension for C++ engineers, performance specialists, computer science students, and researchers.
+**Adaptix** is an enterprise-grade, developer-first algorithmic engineering and optimization engine built natively as a Visual Studio Code extension for C++ engineers, performance specialists, computer science students, and researchers.
 
-Where ADAPTIX 2.0 consolidated algorithmic complexity theory and Semester 5 DAA concepts, **ADAPTIX 3.0** streamlines the user interface, elevates editor-native integration, closes the code-refactoring loop, and enforces progressive disclosure. The result is a frictionless, high-precision production developer tool that retains the full mathematical power of Semester 4 DSA and Semester 5 DAA on demand.
+Where ADAPTIX 2.0 consolidated algorithmic complexity theory and Semester 5 DAA concepts, **Adaptix** streamlines the user interface, elevates editor-native integration, closes the code-refactoring loop, and enforces progressive disclosure. The result is a frictionless, high-precision production developer tool that retains the full mathematical power of Semester 4 DSA and Semester 5 DAA on demand.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                                      ADAPTIX 3.0                                       │
+│                                      Adaptix                                       │
 │          Frictionless Developer-First Algorithm & Data Structure Optimization          │
 ├──────────────────────────┬─────────────────────────────┬───────────────────────────────┤
 │    CODE INTELLIGENCE     │       PERFORMANCE LAB       │        VISUAL DEBUGGER        │
@@ -36,7 +36,7 @@ Where ADAPTIX 2.0 consolidated algorithmic complexity theory and Semester 5 DAA 
 
 ---
 
-## 2. Core Upgrades in ADAPTIX 3.0
+## 2. Core Upgrades in Adaptix
 
 ### Pillar 1 — Decluttering & Progressive Disclosure ("Trim the Fat")
 * **Consolidated 3-Pillar Dashboard:** The 9 fragmented dashboard sections from ADAPTIX 2.0 are now organized into 3 primary tabs:
@@ -84,7 +84,7 @@ Where ADAPTIX 2.0 consolidated algorithmic complexity theory and Semester 5 DAA 
 
 ## 3. Preserved Semester 4 & 5 Engines
 
-ADAPTIX 3.0 preserves 100% backward compatibility with underlying analytical engines:
+Adaptix preserves 100% backward compatibility with underlying analytical engines:
 1. **Data Structure Intelligence (Semester 4 Foundation):**
    * Real-time operation counting (insertions, searches, deletions).
    * Min-Heap priority queue candidate ranking in $O(\log K)$.
@@ -138,7 +138,7 @@ ADAPTIX 3.0 preserves 100% backward compatibility with underlying analytical eng
 
 ## 5. Test Suite and Verification
 
-ADAPTIX 3.0 includes an expanded master test suite verifying all modules:
+Adaptix includes an expanded master test suite verifying all modules:
 
 ```bash
 npm test
@@ -147,7 +147,7 @@ npm test
 ### Verified Test Suites (8/8 Passed):
 ```
 ===============================================================
-  ADAPTIX 3.0 MASTER TEST SUITE EXECUTION
+  Adaptix MASTER TEST SUITE EXECUTION
   Frictionless Algorithm & Data Structure Optimization Engine
 ===============================================================
 
@@ -204,7 +204,7 @@ npm test
 ✓ Unified Pipeline: NP-Hard problem routed to Nature-Inspired Optimization Lab
 >>> [PASS] Unified Intelligence Pipeline (Module 6)
 
---- Testing ADAPTIX 3.0 Architecture & Upgrade Pillars ---
+--- Testing Adaptix Architecture & Upgrade Pillars ---
 ✓ STL Big-O Hover: Comprehensive complexity specifications & loop warnings verified
 ✓ Space vs. Time Slider: Bias dynamically alters decision costs and populates Two-Sentence diagnosis
 ✓ Two-Sentence Rule: Produces crisp Big-O diagnosis upfront with deep theory segregated
@@ -213,11 +213,11 @@ npm test
 ✓ Timeline Scrubber: Verified frame sequential integrity across all 18 trace steps
 ✓ Edge-Case Generator: Successfully constructed and verified concrete failing counterexample
 ✓ Closed-Loop Benchmark: Optimization Verified: Execution time reduced by 99.8% (7600 ms -> 17.52 ms at N = 50,000) (Verified: true)
->>> [PASS] ADAPTIX 3.0 Architecture & Upgrade Pillars (Module 7)
+>>> [PASS] Adaptix Architecture & Upgrade Pillars (Module 7)
 
 ===============================================================
   ALL TEST SUITES PASSED! (8/8 suites passed in 240ms)
-  Semester 4 functionality preserved. Semester 5 DAA verified. ADAPTIX 3.0 Upgrades Operational.
+  Semester 4 functionality preserved. Semester 5 DAA verified. Adaptix Upgrades Operational.
 ===============================================================
 ```
 
@@ -228,7 +228,7 @@ npm test
 ```
 Adaptix-DSA-master/
 ├── package.json                          # Extension manifest (v3.0.0, commands, configuration)
-├── README.md                             # Comprehensive ADAPTIX 3.0 technical documentation
+├── README.md                             # Comprehensive Adaptix technical documentation
 ├── tsconfig.json                         # TypeScript configuration (ES2022, DOM, Node16)
 ├── src/
 │   ├── extension.ts                      # Main entry point registering all 3.0 providers & commands
@@ -286,7 +286,7 @@ Adaptix-DSA-master/
 │   │   └── unifiedPipeline.ts            # Unified cross-cutting intelligence coordinator
 │   └── test/
 │       ├── runAllTests.ts                # Master test runner (all 8 suites)
-│       ├── adaptix3.test.ts              # Comprehensive ADAPTIX 3.0 upgrade tests
+│       ├── adaptix3.test.ts              # Comprehensive Adaptix upgrade tests
 │       ├── algorithms.test.ts            # Algorithm strategy detection tests
 │       ├── complexityBenchmark.test.ts   # Benchmark runner tests
 │       ├── dataStructures.test.ts        # Data structure intelligence tests
@@ -300,4 +300,4 @@ Adaptix-DSA-master/
 ---
 
 ## 7. License & Ownership
-MIT License. Created & Owned by Asmit Bhorade (https://github.com/AsmitBhorade/Adaptix). Upgraded to ADAPTIX 3.0.
+MIT License. Created & Owned by Asmit Bhorade (https://github.com/AsmitBhorade/Adaptix). Upgraded to Adaptix.

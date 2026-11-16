@@ -11,9 +11,15 @@ import { AdaptixDiffContentProvider } from './providers/diffContentProvider';
 import { TemplateInjector, TemplateParadigm } from './refactoring/templateInjector';
 import { EdgeCaseRunner } from './validation/edgeCaseRunner';
 import { BeforeAfterRunner } from './benchmark/beforeAfterRunner';
+import { CppAstParser } from './analysis/astParser';
+import { AlgorithmRewriter } from './refactoring/algorithmRewriter';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('ADAPTIX 3.0 Engine Active (Dashboard-Only Architecture)!');
+    console.log('Adaptix Engine Active!');
+
+    // Clear any stale optimization queue state from previous sessions
+    context.workspaceState.update('adaptixOptQueue', undefined);
+    context.workspaceState.update('adaptixLastOpt', undefined);
 
     const learningLayer = new LearningLayer(context);
     const analyzer = new Analyzer(learningLayer);
@@ -188,7 +194,7 @@ export function activate(context: vscode.ExtensionContext) {
             currentAcademicMode = !currentAcademicMode;
             await vscode.workspace.getConfiguration('adaptix').update('academicMode', currentAcademicMode, vscode.ConfigurationTarget.Global);
             provider.setAcademicMode(currentAcademicMode);
-            vscode.window.showInformationMessage(`ADAPTIX 3.0: Academic Mode ${currentAcademicMode ? 'ENABLED (DAA / NP / Nature Labs Active)' : 'DISABLED (Clean Production Mode)'}`);
+            vscode.window.showInformationMessage(`Adaptix: Academic Mode ${currentAcademicMode ? 'ENABLED (DAA / NP / Nature Labs Active)' : 'DISABLED (Clean Production Mode)'}`);
         })
     );
 
@@ -254,7 +260,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Native Semantic Smart Diff Preview
     context.subscriptions.push(
-        vscode.commands.registerCommand('adaptix.openSmartDiff', async (varName?: string, targetStructure?: string, _functionNode?: any) => {
+        vscode.commands.registerCommand('adaptix.openSmartDiff', async (varName?: string, targetStructure?: string, optType?: string, paradigm?: string) => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
                 vscode.window.showWarningMessage('ADAPTIX: Open a C++ file to preview Smart Diff.');
@@ -262,8 +268,48 @@ export function activate(context: vscode.ExtensionContext) {
             }
 
             const docText = editor.document.getText();
-            const targetDS = targetStructure || 'std::unordered_set';
             const targetVar = varName || 'arr';
+            const isAlgorithm = optType === 'Algorithm' || !currentAnalysis.has(targetVar);
+
+            if (isAlgorithm) {
+                const parseResult = CppAstParser.parse(docText);
+                const funcNode = parseResult.functions.find(f => f.name === targetVar);
+                if (!funcNode) {
+                    vscode.window.showWarningMessage(`ADAPTIX: Could not locate function '${targetVar}' in the active document.`);
+                    return;
+                }
+
+                const rewriteResult = AlgorithmRewriter.rewrite(funcNode, paradigm, docText);
+                if (!rewriteResult.success) {
+                    vscode.window.showErrorMessage(`ADAPTIX: Failed to generate algorithm diff for '${targetVar}'.`);
+                    return;
+                }
+
+                const lines = docText.split('\n');
+                const beforeLines = lines.slice(0, funcNode.startLine - 1);
+                const afterLines = lines.slice(funcNode.endLine);
+                const proposedCode = [...beforeLines, rewriteResult.optimizedCode, ...afterLines].join('\n');
+
+                const virtualUri = await diffProvider.openDiff(
+                    editor.document.uri,
+                    proposedCode,
+                    `ADAPTIX Algorithm Smart Diff: ${targetVar} (${rewriteResult.paradigm})`
+                );
+
+                const choice = await vscode.window.showInformationMessage(
+                    `Algorithm Smart Diff active for ${targetVar}. Accept changes?`,
+                    'Accept Refactor',
+                    'Discard'
+                );
+
+                if (choice === 'Accept Refactor') {
+                    await diffProvider.acceptRefactor(virtualUri);
+                    performSafeAnalysis(editor.document);
+                }
+                return;
+            }
+
+            const targetDS = targetStructure || 'std::unordered_set';
             const analysisCtx = currentAnalysis.get(targetVar);
 
             await vscode.window.withProgress({
@@ -331,9 +377,56 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Apply Refactor Command — safe modification with explicit user confirmation
     context.subscriptions.push(
-        vscode.commands.registerCommand('adaptix.applyRefactor', async (varName: string, targetStructure: string) => {
+        vscode.commands.registerCommand('adaptix.applyRefactor', async (varName: string, targetStructure: string, optType?: string, paradigm?: string) => {
             const editor = vscode.window.activeTextEditor;
             if (!editor || !varName || !targetStructure) {
+                return;
+            }
+
+            const docText = editor.document.getText();
+            const isAlgorithm = optType === 'Algorithm' || !currentAnalysis.has(varName);
+
+            if (isAlgorithm) {
+                const parseResult = CppAstParser.parse(docText);
+                const funcNode = parseResult.functions.find(f => f.name === varName);
+                if (!funcNode) {
+                    vscode.window.showWarningMessage(`ADAPTIX: Could not locate function '${varName}' in the active document.`);
+                    return;
+                }
+
+                const rewriteResult = AlgorithmRewriter.rewrite(funcNode, paradigm, docText);
+                if (!rewriteResult.success) {
+                    vscode.window.showErrorMessage(`ADAPTIX: Failed to generate algorithm refactor for '${varName}'.`);
+                    return;
+                }
+
+                const startPos = new vscode.Position(funcNode.startLine - 1, 0);
+                const endLine = editor.document.lineAt(funcNode.endLine - 1);
+                const endPos = endLine.range.end;
+                const replaceRange = new vscode.Range(startPos, endPos);
+
+                const editsToApply = new vscode.WorkspaceEdit();
+                editsToApply.replace(editor.document.uri, replaceRange, rewriteResult.optimizedCode);
+
+                const choice = await vscode.window.showInformationMessage(
+                    `ADAPTIX: ${rewriteResult.explanation}. Confirm applying algorithmic changes to ${editor.document.fileName}?`,
+                    'Apply Changes',
+                    'Cancel'
+                );
+
+                if (choice === 'Apply Changes') {
+                    const success = await vscode.workspace.applyEdit(editsToApply);
+                    if (success) {
+                        vscode.window.showInformationMessage(`ADAPTIX: Successfully refactored algorithm '${varName}' (${rewriteResult.paradigm})!`);
+                        globalHistory.unshift({
+                            from: 'Inefficient Algorithmic Pattern',
+                            to: rewriteResult.paradigm,
+                            reason: `Optimized algorithm '${varName}'`,
+                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        });
+                        performSafeAnalysis(editor.document);
+                    }
+                }
                 return;
             }
 

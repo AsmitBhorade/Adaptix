@@ -1,6 +1,6 @@
 {
   "name": "adaptix",
-  "displayName": "Adaptix 3.0",
+  "displayName": "Adaptix",
   "description": "ADAPTIX 3.0 — Frictionless Developer-First Algorithm & Data Structure Optimization Engine",
   "publisher": "asmitbhorade",
   "author": "Asmit Bhorade",
@@ -9,7 +9,7 @@
     "url": "https://github.com/AsmitBhorade/Adaptix"
   },
   "icon": "images/logo.png",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "engines": {
     "vscode": "^1.90.0"
   },

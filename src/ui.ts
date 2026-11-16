@@ -95,11 +95,11 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
                     break;
 
                 case 'applyRefactor':
-                    vscode.commands.executeCommand('adaptix.applyRefactor', message.varName, message.targetStructure);
+                    vscode.commands.executeCommand('adaptix.applyRefactor', message.varName, message.targetStructure, message.optType, message.paradigm);
                     break;
 
                 case 'openSmartDiff':
-                    vscode.commands.executeCommand('adaptix.openSmartDiff', message.varName, message.targetStructure);
+                    vscode.commands.executeCommand('adaptix.openSmartDiff', message.varName, message.targetStructure, message.optType, message.paradigm);
                     break;
 
                 case 'injectTemplate':
@@ -320,7 +320,7 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
         // Optimization Strategy display text
         const biasVal = this._optimizationBias === 'memory' ? '0' : this._optimizationBias === 'balanced' ? '1' : '2';
         const biasText = this._optimizationBias === 'memory' ? 'Memory-First [O(1) Space]' :
-                         this._optimizationBias === 'balanced' ? 'Balanced Strategy' : 'Speed-First [O(1) Time]';
+            this._optimizationBias === 'balanced' ? 'Balanced Strategy' : 'Speed-First [O(1) Time]';
 
         // ────────────── SECTION 1: OVERVIEW ──────────────
         const recentHistoryRows = this._recentAnalyses.length === 0
@@ -364,7 +364,7 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
             containerCards.forEach(({ varName, ctx }) => {
                 const isOptimizable = ctx.decision?.suggestedStructure && ctx.decision.suggestedStructure !== ctx.monitor.currentStructure;
                 const confClass = ctx.decision?.confidenceLabel === 'Strong' ? 'conf-strong' :
-                                  ctx.decision?.confidenceLabel === 'Moderate' ? 'conf-moderate' : 'conf-low';
+                    ctx.decision?.confidenceLabel === 'Moderate' ? 'conf-moderate' : 'conf-low';
                 const twoSentence = ctx.decision?.twoSentenceSummary ||
                     `${varName} (${ctx.monitor.currentStructure.replace('std::', '')}) exhibits high operation overhead. Switching to ${ctx.decision?.suggestedStructure?.replace('std::', '') || 'optimal container'} improves complexity.`;
                 const deepExplain = ctx.decision?.deepExplanation || ctx.decision?.explanation?.primaryReason || 'Detailed theoretical analysis and asymptotic trade-offs available.';
@@ -449,11 +449,46 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
             });
         }
 
-        // ────────────── SECTION 3: OPTIMIZATION WORKFLOW ──────────────
-        const primaryOpt = containerCards.find(c => c.ctx.decision?.suggestedStructure && c.ctx.decision.suggestedStructure !== c.ctx.monitor.currentStructure);
-        const optVarName = primaryOpt ? primaryOpt.varName : 'activeOrderIds';
-        const optCurrentDS = primaryOpt ? primaryOpt.ctx.monitor.currentStructure : 'std::vector';
-        const optTargetDS = primaryOpt ? (primaryOpt.ctx.decision?.suggestedStructure || 'std::unordered_set') : 'std::unordered_set';
+        // ────────────── SECTION 3: OPTIMIZATION WORKFLOW (CAROUSEL) ──────────────
+        const allOpts: {
+            type: 'Data Structure' | 'Algorithm';
+            varName: string;
+            currentDS: string;
+            targetDS: string;
+            speedup: string;
+            confidence: string;
+            twoSentence: string;
+            deepExplain: string;
+            paradigm?: string;
+            diffDel?: string;
+            diffAdd?: string;
+        }[] = [];
+
+        if (report?.optimizations && report.optimizations.length > 0) {
+            allOpts.push(...report.optimizations);
+        } else {
+            containerCards.forEach(c => {
+                if (c.ctx.decision?.suggestedStructure && c.ctx.decision.suggestedStructure !== c.ctx.monitor.currentStructure) {
+                    allOpts.push({
+                        type: 'Data Structure',
+                        varName: c.varName,
+                        currentDS: c.ctx.monitor.currentStructure,
+                        targetDS: c.ctx.decision.suggestedStructure,
+                        speedup: c.ctx.decision.speedup || 'Faster',
+                        confidence: c.ctx.decision.confidenceLabel,
+                        twoSentence: c.ctx.decision.twoSentenceSummary || '',
+                        deepExplain: c.ctx.decision.deepExplanation || ''
+                    });
+                }
+            });
+        }
+
+        const allOptsJson = JSON.stringify(allOpts);
+        // For benchmark tab: use first real opt or empty strings — no ghost fallback
+        const benchOpt = allOpts[0];
+        const optVarName = benchOpt ? benchOpt.varName : '';
+        const optCurrentDS = benchOpt ? benchOpt.currentDS : '';
+        const optTargetDS = benchOpt ? benchOpt.targetDS : '';
 
         // ────────────── SECTION 4: BENCHMARK LAB ──────────────
         // Section 4 HTML is interactive via Webview JS and BeforeAfterRunner
@@ -466,7 +501,7 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ADAPTIX 3.0</title>
+    <title>Adaptix</title>
     <style>
         :root {
             --bg-base: #0b0f17;
@@ -584,7 +619,7 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
         <div class="brand-title">
             <div class="brand-logo-text">
                 <span>ADAPTIX</span>
-                <span class="brand-badge">3.0 PRO</span>
+                <span class="brand-badge">v3.1.0</span>
             </div>
             <div class="brand-subtext">Asmit Bhorade &bull; Algorithm Intelligence Engine</div>
         </div>
@@ -728,118 +763,101 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
     </div>
 
     <!-- ───────────────────────────────────────────────────────────── -->
-    <!-- SECTION 3: OPTIMIZATION WORKFLOW -->
+    <!-- SECTION 3: OPTIMIZATION WORKFLOW (CAROUSEL) -->
     <!-- ───────────────────────────────────────────────────────────── -->
     <div id="tab-optimization" class="tab-panel ${activeTab === 'optimization' ? 'active' : ''}">
         <div class="glass-card">
             <div class="card-header">
-                <span class="card-title">Step-by-Step Optimization Workflow</span>
-                <span class="badge recommendation">Safe Refactoring</span>
+                <span class="card-title">Optimization Workflow</span>
+                <span id="optTypeBadge" class="badge" style="display: none;"></span>
+                <span id="optCounterBadge" class="badge recommendation">${allOpts.length > 0 ? allOpts.length + ' Opportunities' : 'No Issues Found'}</span>
             </div>
             <p style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 8px;">
-                Walk through identified opportunities, inspect problem diagnostics, review proposed code diffs, and apply optimizations with confirmation.
+                Browse all detected algorithmic bottlenecks and data structure inefficiencies. Navigate freely, inspect before/after diffs, and apply optimizations with confirmation.
             </p>
 
-            <!-- Step 1: Suggested Improvement -->
-            <div style="margin-bottom: 10px;">
-                <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-cyan); margin-bottom: 2px;">
-                    <span class="step-num">1</span> Suggested Improvement
-                </div>
-                <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 4px; font-size: 0.7rem;">
-                    Migrate <code>${escapeHtml(optVarName)}</code> from <strong style="color: #fca5a5;">${escapeHtml(optCurrentDS)}</strong> to <strong style="color: var(--accent-green);">${escapeHtml(optTargetDS)}</strong>
-                </div>
+            ${allOpts.length === 0 ? `
+            <!-- Empty state -->
+            <div style="text-align: center; padding: 24px 16px; color: var(--text-muted);">
+                <div style="font-size: 2rem; margin-bottom: 8px;">✅</div>
+                <div style="font-size: 0.8rem; font-weight: 600; color: var(--accent-green); margin-bottom: 4px;">No optimizations detected.</div>
+                <div style="font-size: 0.7rem;">Open a C++ file to analyze data structure usage and algorithmic efficiency.</div>
+            </div>
+            ` : `
+            <!-- Carousel navigation header -->
+            <div id="optCarouselNav" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 6px;">
+                <button class="btn-action" style="padding: 3px 10px; font-size: 0.7rem;" onclick="optPrev()">&#8249; Prev</button>
+                <span id="optCounter" style="font-size: 0.72rem; font-weight: 600; color: var(--accent-cyan); text-align: center; flex: 1;">Optimization 1 of ${allOpts.length}</span>
+                <button class="btn-action" style="padding: 3px 10px; font-size: 0.7rem;" onclick="optNext()">Next &#8250;</button>
             </div>
 
-            <!-- Step 2: The Problem -->
-            <div style="margin-bottom: 10px;">
-                <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-orange); margin-bottom: 2px;">
-                    <span class="step-num">2</span> The Problem (Why It Degrades Performance)
-                </div>
-                <p style="font-size: 0.7rem; color: var(--text-secondary); background: rgba(0,0,0,0.2); padding: 6px 8px; border-radius: 4px;">
-                    Inside the processing loop, <code>.erase()</code> on contiguous memory forces a linear shift of all following elements. Repeated within a loop, this turns an intended linear filter into an O(N²) quadratic bottleneck.
-                </p>
-            </div>
+            <!-- Carousel card (populated by JS) -->
+            <div id="optCardContainer">
 
-            <!-- Step 3: The Alternative -->
-            <div style="margin-bottom: 10px;">
-                <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-green); margin-bottom: 2px;">
-                    <span class="step-num">3</span> The Alternative (Why It Resolves The Issue)
+                <!-- Step 1: Suggested Improvement -->
+                <div style="margin-bottom: 10px;">
+                    <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-cyan); margin-bottom: 2px;">
+                        <span class="step-num">1</span> Suggested Improvement
+                    </div>
+                    <div id="optStep1" style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 4px; font-size: 0.7rem;">
+                        <!-- filled by JS -->
+                    </div>
                 </div>
-                <p style="font-size: 0.7rem; color: var(--text-secondary); background: rgba(0,0,0,0.2); padding: 6px 8px; border-radius: 4px;">
-                    <code>${escapeHtml(optTargetDS)}</code> implements hash-bucket key lookups and unlinked node erasures, achieving O(1) amortized deletion without shifting sibling elements.
-                </p>
-            </div>
 
-            <!-- Step 4: Expected Complexity Changes -->
-            <div style="margin-bottom: 10px;">
-                <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-purple); margin-bottom: 2px;">
-                    <span class="step-num">4</span> Expected Complexity Changes
+                <!-- Step 2: The Problem -->
+                <div style="margin-bottom: 10px;">
+                    <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-orange); margin-bottom: 2px;">
+                        <span class="step-num">2</span> The Problem
+                    </div>
+                    <p id="optStep2" style="font-size: 0.7rem; color: var(--text-secondary); background: rgba(0,0,0,0.2); padding: 6px 8px; border-radius: 4px; margin: 0;">
+                        <!-- filled by JS -->
+                    </p>
                 </div>
-                <table class="dp-grid">
-                    <thead>
-                        <tr>
-                            <th>Metric</th>
-                            <th>Before (${escapeHtml(optCurrentDS.replace('std::', ''))})</th>
-                            <th>After (${escapeHtml(optTargetDS.replace('std::', ''))})</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Batch Erase</td>
-                            <td style="color: #fca5a5;">O(N²) Quadratic</td>
-                            <td style="color: var(--accent-green); font-weight: bold;">O(N) Linear</td>
-                        </tr>
-                        <tr>
-                            <td>Duplicate Check</td>
-                            <td style="color: #fca5a5;">O(N) std::find</td>
-                            <td style="color: var(--accent-green); font-weight: bold;">O(1) .count()</td>
-                        </tr>
-                        <tr>
-                            <td>Auxiliary Space</td>
-                            <td style="color: #86efac;">O(1) overhead</td>
-                            <td style="color: #fde047;">O(N) hash table</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
 
-            <!-- Step 5 & 6: Proposed Code & Diff Preview -->
-            <div style="margin-bottom: 10px;">
-                <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-cyan); margin-bottom: 2px;">
-                    <span class="step-num">5</span> Before / After Diff Preview
+                <!-- Step 3: The Alternative -->
+                <div style="margin-bottom: 10px;">
+                    <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-green); margin-bottom: 2px;">
+                        <span class="step-num">3</span> The Alternative
+                    </div>
+                    <p id="optStep3" style="font-size: 0.7rem; color: var(--text-secondary); background: rgba(0,0,0,0.2); padding: 6px 8px; border-radius: 4px; margin: 0;">
+                        <!-- filled by JS -->
+                    </p>
                 </div>
-                <div class="diff-container">
-                    <div class="diff-block diff-del">- ${escapeHtml(optCurrentDS)}&lt;int&gt; ${escapeHtml(optVarName)};
-- ${escapeHtml(optVarName)}.push_back(orderId);
-- auto it = std::find(${escapeHtml(optVarName)}.begin(), ${escapeHtml(optVarName)}.end(), id);
-- ${escapeHtml(optVarName)}.erase(it);</div>
-                    <div class="diff-block diff-add">+ ${escapeHtml(optTargetDS)}&lt;int&gt; ${escapeHtml(optVarName)};
-+ ${escapeHtml(optVarName)}.insert(orderId);
-+ bool exists = ${escapeHtml(optVarName)}.count(id) &gt; 0;
-+ ${escapeHtml(optVarName)}.erase(id);</div>
-                </div>
-                <button class="btn-action" style="width: 100%; margin-top: 4px;" onclick="openSmartDiff('${optVarName}', '${optTargetDS}')">
-                    🔍 Open Side-by-Side Smart Diff in VS Code
-                </button>
-            </div>
 
-            <!-- Step 7: Explicit User Confirmation & Apply -->
-            <div>
-                <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-green); margin-bottom: 4px;">
-                    <span class="step-num">6</span> Confirm & Apply Optimization
-                </div>
-                <p style="font-size: 0.68rem; color: var(--text-muted); margin-bottom: 6px;">
-                    Safety Guarantee: Changes are never silently applied. Comments, namespaces, includes, and unrelated functions are preserved.
-                </p>
-                <div style="display: flex; gap: 6px;">
-                    <button class="btn-action success" style="flex: 1;" onclick="applyRefactor('${optVarName}', '${optTargetDS}')">
-                        ✓ Confirm & Apply Changes
-                    </button>
-                    <button class="btn-action purple" style="flex: 1;" onclick="injectTemplate('dynamic_programming_tab')">
-                        🛠️ Inject DP Skeleton
+                <!-- Step 4: Diff Preview -->
+                <div style="margin-bottom: 10px;">
+                    <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-cyan); margin-bottom: 2px;">
+                        <span class="step-num">4</span> Before / After Diff Preview
+                    </div>
+                    <div class="diff-container">
+                        <div id="optDiffDel" class="diff-block diff-del"></div>
+                        <div id="optDiffAdd" class="diff-block diff-add"></div>
+                    </div>
+                    <button class="btn-action" style="width: 100%; margin-top: 4px;" onclick="openSmartDiffCurrent()">
+                        🔍 Open Side-by-Side Smart Diff in VS Code
                     </button>
                 </div>
+
+                <!-- Step 5: Confirm & Apply -->
+                <div>
+                    <div style="font-size: 0.72rem; font-weight: 700; color: var(--accent-green); margin-bottom: 4px;">
+                        <span class="step-num">5</span> Confirm &amp; Apply Optimization
+                    </div>
+                    <p style="font-size: 0.68rem; color: var(--text-muted); margin-bottom: 6px;">
+                        Safety Guarantee: Changes are never silently applied. Comments, namespaces, includes, and unrelated functions are preserved.
+                    </p>
+                    <div style="display: flex; gap: 6px;">
+                        <button class="btn-action success" style="flex: 1;" onclick="applyCurrentOpt()">
+                            ✓ Confirm &amp; Apply Changes
+                        </button>
+                        <button class="btn-action purple" style="flex: 1;" onclick="injectTemplate('dynamic_programming_tab')">
+                            🛠️ Inject DP Skeleton
+                        </button>
+                    </div>
+                </div>
+
             </div>
+            `}
         </div>
     </div>
 
@@ -1041,6 +1059,123 @@ export class AdaptixViewProvider implements vscode.WebviewViewProvider {
         let isPlaying = false;
         let playSpeedMultiplier = 1.0;
         let playbackTimer = null;
+
+        // ── Optimization Carousel State ──────────────────────────────────
+        const ALL_OPTS = ${allOptsJson};
+        let currentOptIdx = 0;
+
+        function esc(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        function renderOptCard(idx) {
+            if (!ALL_OPTS || ALL_OPTS.length === 0) { return; }
+            if (idx < 0 || idx >= ALL_OPTS.length) { return; }
+            const opt = ALL_OPTS[idx];
+            if (!opt) { return; }
+            const counter = document.getElementById('optCounter');
+            if (counter) { counter.innerText = 'Optimization ' + (idx + 1) + ' of ' + ALL_OPTS.length; }
+
+            // Dynamic type badge: Data Structure vs Algorithm
+            const typeBadge = document.getElementById('optTypeBadge');
+            if (typeBadge) {
+                const isAlgo = opt.type === 'Algorithm';
+                typeBadge.style.display = 'inline-block';
+                typeBadge.innerText = isAlgo ? '🧠 Algorithm' : '📦 Data Structure';
+                if (isAlgo) {
+                    typeBadge.className = 'badge';
+                    typeBadge.style.background = 'rgba(168, 85, 247, 0.2)';
+                    typeBadge.style.color = '#c084fc';
+                    typeBadge.style.border = '1px solid rgba(168, 85, 247, 0.4)';
+                } else {
+                    typeBadge.className = 'badge';
+                    typeBadge.style.background = 'rgba(56, 189, 248, 0.2)';
+                    typeBadge.style.color = '#38bdf8';
+                    typeBadge.style.border = '1px solid rgba(56, 189, 248, 0.4)';
+                }
+            }
+
+            const s1 = document.getElementById('optStep1');
+            if (s1) {
+                const actionVerb = opt.type === 'Algorithm' ? 'Refactor' : 'Migrate';
+                s1.innerHTML = actionVerb + ' <code>' + esc(opt.varName) + '</code> from <strong style="color:#fca5a5;">' + esc(opt.currentDS) + '</strong> to <strong style="color:var(--accent-green);">' + esc(opt.targetDS) + '</strong>';
+            }
+            const s2 = document.getElementById('optStep2');
+            if (s2) { s2.innerText = opt.twoSentence || ('Using ' + opt.currentDS + ' here causes unnecessary overhead. Switching to ' + opt.targetDS + ' resolves it.'); }
+            const s3 = document.getElementById('optStep3');
+            if (s3) { s3.innerText = opt.deepExplain || (opt.targetDS + " provides O(1) average-case operations vs the current structure's O(N) penalty."); }
+            const dd = document.getElementById('optDiffDel');
+            if (dd) {
+                dd.innerText = opt.diffDel || [
+                    '- ' + opt.currentDS + '<T> ' + opt.varName + ';',
+                    '- ' + opt.varName + '.push_back(val);',
+                    '- auto it = std::find(' + opt.varName + '.begin(), ' + opt.varName + '.end(), key);',
+                    '- ' + opt.varName + '.erase(it);'
+                ].join(String.fromCharCode(10));
+            }
+            const da = document.getElementById('optDiffAdd');
+            if (da) {
+                da.innerText = opt.diffAdd || [
+                    '+ ' + opt.targetDS + '<T> ' + opt.varName + ';',
+                    '+ ' + opt.varName + '.insert(val);',
+                    '+ bool found = ' + opt.varName + '.count(key) > 0;',
+                    '+ ' + opt.varName + '.erase(key);'
+                ].join(String.fromCharCode(10));
+            }
+        }
+
+        function optPrev() {
+            if (currentOptIdx > 0) { currentOptIdx--; renderOptCard(currentOptIdx); }
+        }
+
+        function optNext() {
+            if (currentOptIdx < ALL_OPTS.length - 1) { currentOptIdx++; renderOptCard(currentOptIdx); }
+        }
+
+        // Aliases for robustness
+        const prevOpt = optPrev;
+        const nextOpt = optNext;
+
+        function openSmartDiffCurrent() {
+            if (!ALL_OPTS || ALL_OPTS.length === 0) { return; }
+            const opt = ALL_OPTS[currentOptIdx];
+            if (!opt) { return; }
+            vscode.postMessage({ command: 'openSmartDiff', varName: opt.varName, targetStructure: opt.targetDS, optType: opt.type, paradigm: opt.paradigm });
+        }
+
+        function applyCurrentOpt() {
+            if (!ALL_OPTS || ALL_OPTS.length === 0) { return; }
+            const opt = ALL_OPTS[currentOptIdx];
+            if (!opt) { return; }
+            vscode.postMessage({ command: 'applyRefactor', varName: opt.varName, targetStructure: opt.targetDS, optType: opt.type, paradigm: opt.paradigm });
+            ALL_OPTS.splice(currentOptIdx, 1);
+            if (ALL_OPTS.length === 0) {
+                currentOptIdx = 0;
+                const container = document.getElementById('optCardContainer');
+                const badge = document.getElementById('optCounterBadge');
+                const typeBadge = document.getElementById('optTypeBadge');
+                const nav = document.getElementById('optCarouselNav');
+                if (container) { container.innerHTML = '<div style="text-align:center;padding:24px 16px;color:var(--text-muted);"><div style="font-size:2rem;margin-bottom:8px;">✅</div><div style="font-size:0.8rem;font-weight:600;color:var(--accent-green);">All optimizations applied!</div></div>'; }
+                if (badge) { badge.innerText = 'No Issues Found'; }
+                if (typeBadge) { typeBadge.style.display = 'none'; }
+                if (nav) { nav.style.display = 'none'; }
+            } else {
+                currentOptIdx = Math.min(currentOptIdx, ALL_OPTS.length - 1);
+                renderOptCard(currentOptIdx);
+                const badge = document.getElementById('optCounterBadge');
+                if (badge) { badge.innerText = ALL_OPTS.length + ' Opportunities'; }
+            }
+        }
+
+        // Initialize carousel on load safely
+        try {
+            if (typeof ALL_OPTS !== 'undefined' && Array.isArray(ALL_OPTS) && ALL_OPTS.length > 0) {
+                renderOptCard(0);
+            }
+        } catch (e) {
+            console.error('Error initializing carousel:', e);
+        }
+        // ─────────────────────────────────────────────────────────────────
 
         function selectTab(tabId) {
             activeTabId = tabId;

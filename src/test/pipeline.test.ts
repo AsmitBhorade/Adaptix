@@ -74,5 +74,64 @@ export function runPipelineTests() {
         assert.ok(report.suggestedVisualizer.title.includes('TSP') || report.suggestedVisualizer.title.includes('Route'));
         console.log('✓ Unified Pipeline: NP-Hard problem routed to Nature-Inspired Optimization Lab');
     }
+
+    // Test 3: Generalized Algorithm Auto-Refactoring & Unified Optimizations
+    {
+        const multiCode = `
+        #include <vector>
+        #include <string>
+        #include <algorithm>
+
+        // Recursive Fibonacci - exponential candidate
+        int fib(int n) {
+            if (n <= 1) return n;
+            return fib(n - 1) + fib(n - 2);
+        }
+
+        // Quadratic Bubble Sort
+        void bubbleSort(std::vector<int>& arr) {
+            int n = arr.size();
+            for (int i = 0; i < n - 1; i++) {
+                for (int j = 0; j < n - i - 1; j++) {
+                    if (arr[j] > arr[j + 1]) {
+                        std::swap(arr[j], arr[j + 1]);
+                    }
+                }
+            }
+        }
+
+        int main() {
+            std::vector<int> q;
+            for (int i = 0; i < 20; i++) {
+                q.insert(q.begin(), i);
+            }
+            return 0;
+        }
+        `;
+
+        const pipeline = new UnifiedPipeline(new Analyzer());
+        const report = pipeline.analyze(multiCode);
+
+        // Verify Unified Optimizations array
+        assert.ok(report.optimizations && report.optimizations.length >= 2, 'Should detect at least 2 optimizations');
+        const dsOpts = report.optimizations.filter(o => o.type === 'Data Structure');
+        const algoOpts = report.optimizations.filter(o => o.type === 'Algorithm');
+
+        assert.ok(dsOpts.length >= 1, 'Should include Data Structure optimization');
+        assert.ok(algoOpts.length >= 1, 'Should include Algorithm optimization');
+
+        // Check fib rewrite
+        const fibOpt = algoOpts.find(o => o.varName === 'fib');
+        assert.ok(fibOpt !== undefined, 'Should detect fib as algorithm optimization');
+        assert.strictEqual(fibOpt?.type, 'Algorithm');
+        assert.strictEqual(fibOpt?.paradigm, 'dynamic_programming_tab');
+
+        // Check bubbleSort rewrite
+        const sortOpt = algoOpts.find(o => o.varName === 'bubbleSort');
+        assert.ok(sortOpt !== undefined, 'Should detect bubbleSort as algorithm optimization');
+        assert.strictEqual(sortOpt?.type, 'Algorithm');
+
+        console.log(`✓ Generalized Algorithm Auto-Refactoring: Unified ${report.optimizations.length} items (${dsOpts.length} DS, ${algoOpts.length} Algo)`);
+    }
 }
 
